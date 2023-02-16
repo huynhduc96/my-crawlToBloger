@@ -8,8 +8,8 @@ const { Configuration, OpenAIApi } = require("openai");
 var formatRFC3339 = require("date-fns/formatRFC3339");
 var addHours = require("date-fns/addHours");
 var parseISO = require("date-fns/parseISO");
+const Axios = require("axios");
 
-// const BASE_URL = "https://thebestcatpage.com/category/rescue-stories/";
 const BASE_URL = "https://thebestcatpage.com/category/rescue-stories/page/326/";
 
 const startTime = "2023-02-27T21:40:36+09:00";
@@ -23,6 +23,7 @@ const listLinkSelect = [];
 const listLinkInPage = [];
 
 const blogger = google.blogger("v3");
+const drive = google.drive("v3");
 
 const params = {
   blogId: process.env.BLOG_ID,
@@ -40,7 +41,7 @@ async function getAllLinkInPage_thebestcatpage(html) {
   });
 }
 
-async function getTitleAndPost_thebestcatpage(html) {
+async function getTitleAndPost_thebestcatpage(html, drive) {
   if (html) {
     var $ = cheerio.load(html);
   }
@@ -56,7 +57,9 @@ async function getTitleAndPost_thebestcatpage(html) {
 
     // console.log("dataPost.children().text() :", dataPost.html());
 
-    dataPost.children().each((index, element) => {
+    dataPost.children().each(async (index, element) => {});
+
+    for (const element of dataPost.children()) {
       const rawHTML = String($(element).html());
 
       if ($(element).children().text().includes("<img")) {
@@ -73,11 +76,18 @@ async function getTitleAndPost_thebestcatpage(html) {
         // dataRaw = rawHTML + `<img src="${$(element).find("a").attr("href")}"/>`;
         // origin
         //  dataRaw = dataRaw + `<p>${$(element).children().text()}</p> `;
+
+        var imgSrc = await getLinkImage(
+          $(img).attr("src"),
+          $(img).attr("aria-describedby")
+        );
+        console.log("imgSrc: ", imgSrc);
+
         dataRaw =
           dataRaw +
-          `<p><img src="${$(img).attr("src")}" width="${$(img).attr(
-            "width"
-          )}" height="${$(img).attr("height")}"/></p> `;
+          `<p><img src="${imgSrc}" width="${$(img).attr("width")}" height="${$(
+            img
+          ).attr("height")}"/></p> `;
       } else {
         if (rawHTML.includes("href=")) {
           dataRaw =
@@ -91,7 +101,7 @@ async function getTitleAndPost_thebestcatpage(html) {
           dataRaw = dataRaw + `<p>${$(element).html()}</p> `;
         }
       }
-    });
+    }
 
     //  console.log("dataRaw : ", dataRaw);
 
@@ -101,14 +111,66 @@ async function getTitleAndPost_thebestcatpage(html) {
   }
 }
 
+async function getLinkImage(src, name) {
+  var imgSrc = "";
+  if (src) {
+    const fileMetaData = {
+      name: `${name}.jpg`,
+      parents: [process.env.GOOGLE_FORDER_ID],
+    };
+
+    const imageDownload = await Axios({
+      url: src,
+      method: "GET",
+      responseType: "stream",
+    });
+
+    const media = {
+      mimeType: "image/jpg",
+      body: imageDownload.data,
+    };
+
+    const response = await drive.files
+      .create({
+        resource: fileMetaData,
+        media: media,
+        field: "id",
+      })
+      .catch((error) => {
+        console.log(error.response.data);
+      });
+
+    const id = response.data.id;
+    console.log("upload img : " + id);
+    imgSrc = `https://drive.google.com/uc?export=view&id=${id}`;
+
+    // sleep 1 second
+    await new Promise((r) => {
+      setTimeout(r, 1 * 1000);
+    });
+
+  } else {
+    imgSrc = src;
+  }
+  return imgSrc;
+}
+
 async function checkDataPost(link) {
+  const auth = await authenticate({
+    keyfilePath: path.join(__dirname, "credentials.json"),
+    scopes: "https://www.googleapis.com/auth/drive",
+  });
+
+  google.options({ auth });
+
   const pageHtml = await axios.request({
     method: "GET",
     url: link,
   });
   if (pageHtml.data) {
     const { title, dataPost } = await getTitleAndPost_thebestcatpage(
-      pageHtml.data
+      pageHtml.data,
+      drive
     );
 
     console.log("title: ", title);
