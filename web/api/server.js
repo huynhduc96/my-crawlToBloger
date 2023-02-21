@@ -4,12 +4,375 @@ const app = express(),
   bodyParser = require("body-parser");
 port = 3080;
 
+// app to post blog
+const cheerio = require("cheerio");
+const axios = require("axios");
+const Axios = require("axios");
+const { google } = require("googleapis");
+const { authenticate } = require("@google-cloud/local-auth");
+
+// Time
+var formatRFC3339 = require("date-fns/formatRFC3339");
+var addHours = require("date-fns/addHours");
+var parseISO = require("date-fns/parseISO");
+// chatGPT
+const { Configuration, OpenAIApi } = require("openai");
+
+const domainList = [
+  {
+    id: 0,
+    value: "https://thebestcatpage.com/",
+  },
+];
+
+// read file
 const fs = require("fs");
 var blogId = "";
 var openAPIKey = "";
 var googleDriveFolderID = "";
 var startTime = "";
+
+// open api endpoint
+var openai = undefined;
+
+// blog and driver
+const blogger = google.blogger("v3");
+const drive = google.drive("v3");
+
 // ----------------- End import --------------------------
+
+// <<<---------------- Parser HTML --------------------------------
+
+async function getAllLinkInPage_thebestcatpage(link, domainId) {
+  var crawlPage404 = false;
+  var listLinkInPage = [];
+  await axios
+    .request({
+      method: "GET",
+      url: link,
+    })
+    .then((result) => {
+      var $ = cheerio.load(result.data);
+      const listAtagName = $("#content_box > article");
+      if (listAtagName.length === 0) {
+        return {
+          isOk: false,
+          message: crawlPage404
+            ? `${link} : \n The structure of this article is incorrect  \n check link again`
+            : "",
+          data: listLinkInPage,
+        };
+      }
+
+      listAtagName.each((index, element) => {
+        var linkInPage = $(element).children("a").attr("href");
+        listLinkInPage.push(linkInPage);
+      });
+    })
+    .catch((error) => {
+      if (error.response) {
+        if (error.response.status === 404) {
+          crawlPage404 = true;
+        }
+      }
+    });
+  return {
+    isOk: !crawlPage404,
+    message: crawlPage404 ? `${link} : \n Link Not Found : Code 404` : "",
+    data: listLinkInPage,
+  };
+}
+
+async function getTitleAndPost_thebestcatpage(html, isUsingDrive) {
+  if (html) {
+    var $ = cheerio.load(html);
+  }
+
+  const dataPost = $(
+    "#content_box > div > div.single_post > div > div.thecontent.clearfix"
+  );
+
+  if (dataPost.length === 0) {
+    return { title: null, dataPost: null };
+  }
+  var isOkResult = true;
+  var messageResult = "";
+
+  if (dataPost.children().text().includes("<img")) {
+    var dataRaw = "";
+    const titlePost = $("#content_box > div > div.single_post > header > h1");
+
+    // get html : dataPost.html()
+
+    // console.log("dataPost.children().text() :", dataPost.html());
+
+    for (const element of dataPost.children()) {
+      if (!isOkResult) {
+        break;
+      }
+      const rawHTML = String($(element).html());
+
+      if ($(element).children().text().includes("<img")) {
+        // console.log("img raw: ", $(element).find("a").attr("href"));
+
+        const imgHtml = $(element).children().text();
+
+        const img = $(`<div>${imgHtml}</div>`).html();
+
+        // console.log("img: ", $(img).attr("src"));
+        // console.log("img: ", $(img).attr("width"));
+        // console.log("img: ", $(img).attr("height"));
+
+        // dataRaw = rawHTML + `<img src="${$(element).find("a").attr("href")}"/>`;
+        // origin
+        //  dataRaw = dataRaw + `<p>${$(element).children().text()}</p> `;
+
+        const { imgSrc, isOk, message } = await getLinkImage(
+          $(img).attr("src"),
+          $(img).attr("aria-describedby"),
+          isUsingDrive
+        );
+        console.log("imgSrc: ", imgSrc);
+
+        if (isOk === false) {
+          isOkResult = isOk;
+          messageResult = message;
+          break;
+        }
+
+        dataRaw =
+          dataRaw +
+          `<p><img src="${imgSrc}" width="${$(img).attr("width")}" height="${$(
+            img
+          ).attr("height")}"/></p> `;
+      } else {
+        if (rawHTML.includes("href=")) {
+          dataRaw =
+            dataRaw +
+            `<p>${rawHTML.replace(
+              /href=".*"/,
+              `href="https://www.animalnew247.com/"`
+            )}</p> `;
+        } else if ($(element).text().includes("Source:")) {
+        } else {
+          dataRaw = dataRaw + `<p>${$(element).html()}</p> `;
+        }
+      }
+    }
+
+    if (isOkResult === false) {
+      return {
+        title: null,
+        dataPost: null,
+        msg: messageResult,
+        driverProblem: true,
+      };
+    }
+
+    return {
+      title: titlePost.text(),
+      dataPost: dataRaw,
+      msg: messageResult,
+      driverProblem: false,
+    };
+  } else {
+    return {
+      title: null,
+      dataPost: null,
+      msg: messageResult,
+      driverProblem: false,
+    };
+  }
+}
+
+// ---------------- End Parser HTML --------------------------------
+
+// <<<---------------- upload image to drive ------------------
+
+async function getLinkImage(src, name, isUsingDrive) {
+  var imgSrc = "";
+  var isOk = true;
+  var message = "";
+  if (src && isUsingDrive) {
+    const fileMetaData = {
+      name: `${name}.jpg`,
+      parents: [googleDriveFolderID],
+    };
+
+    const imageDownload = await Axios({
+      url: src,
+      method: "GET",
+      responseType: "stream",
+    }).catch((error) => {
+      if (error.response) {
+        if (error.response.status === 404) {
+          isOk = false;
+          message = `${src}:  image link not exist`;
+        }
+      }
+    });
+
+    const media = {
+      mimeType: "image/jpg",
+      body: imageDownload.data,
+    };
+
+    await drive.files
+      .create({
+        resource: fileMetaData,
+        media: media,
+        field: "id",
+      })
+      .then((response) => {
+        const id = response.data.id;
+        imgSrc = `https://drive.google.com/uc?export=view&id=${id}`;
+      })
+      .catch((error) => {
+        isOk = false;
+        message = `Drive Problem: ${error.response.data.error.message}`;
+      });
+
+    // sleep 1 second
+    await new Promise((r) => {
+      setTimeout(r, 1 * 1000);
+    });
+  } else {
+    imgSrc = src;
+  }
+  return { imgSrc: imgSrc, isOK: isOk, message: message };
+}
+
+// <<<--------------- Post 1 link -------------------------
+async function post1Link(
+  link,
+  isUsingOpenAPI,
+  isUsingDrive,
+  startTime,
+  tag,
+  domainID
+) {
+  var result;
+  var crawlPage404 = false;
+  const pageHtml = await axios
+    .request({
+      method: "GET",
+      url: link,
+    })
+    .catch((error) => {
+      if (error.response) {
+        if (error.response.status === 404) {
+          console.log(error.response.statusText); // "Not Found"
+          crawlPage404 = true;
+        }
+      }
+    });
+  await new Promise((r) => {
+    setTimeout(r, 100);
+  });
+  if (crawlPage404) {
+    return { isOk: false, message: `${link} : \n Link Not Found : Code 404` };
+  } else {
+    if (pageHtml.data) {
+      const { title, dataPost, msg, driverProblem } =
+        await getTitleAndPost_thebestcatpage(pageHtml.data, isUsingDrive);
+
+      if ((title === null || dataPost === null) && !driverProblem) {
+        return {
+          isOk: false,
+          message: `${link} : \n The structure of this article is incorrect  \n check link again`,
+        };
+      }
+
+      if (driverProblem) {
+        return {
+          isOk: false,
+          message: msg,
+        };
+      }
+
+      var titlePost;
+      if (isUsingOpenAPI) {
+        const dataTitleParam = `rewrite this sentence "${title}"`;
+        const completion = await openai
+          .createCompletion({
+            model: "text-davinci-003",
+            prompt: dataTitleParam,
+            temperature: 0,
+            max_tokens: 100,
+            top_p: 1,
+            frequency_penalty: 0,
+            presence_penalty: 0,
+          })
+          .then(() => {
+            const new_title_tml = completion.data.choices[0].text;
+            const new_title = new_title_tml.replace(/[\r\n]/gm, "");
+            // console.log("old titlePost : ", title);
+            // console.log("new titlePost : ", new_title);
+            titlePost = new_title;
+          })
+          .catch((err) => {
+            result = { isOk: false, message: err.response.data.error.message };
+          });
+      } else {
+        titlePost = title;
+      }
+      if (isUsingOpenAPI && result.isOk) {
+        return result;
+      }
+      // post to blogger website
+
+      // await blogger.posts
+      //   .insert({
+      //     blogId: blogId,
+      //     requestBody: {
+      //       published: startTime,
+      //       labels: [tag],
+      //       // labels: ["Rescue story"],
+      //       title: titlePost,
+      //       content: dataPost,
+      //     },
+      //   })
+      //   .then((res) => {
+      //     console.log("Status Post :  ", res.status);
+      //     console.log("link seft :  ", res.data.selfLink);
+      //     var selfLink = res.data.selfLink;
+      //     const listData = selfLink.split("/");
+      //     console.log("listData: ", listData[5]);
+      //     console.log("listData: ", listData[7]);
+      //     const linkExport = `https://blogger.com/blog/post/edit/${listData[5]}/${listData[7]}`;
+      //     console.log("linkExport: ", linkExport);
+      //     result = {
+      //       isOk: true,
+      //       message: `Post ok , you can check in :\n ${linkExport}`,
+      //     };
+      //   })
+      //   .catch((err) => {
+      //     result = {
+      //       isOk: false,
+      //       message: `Post to Blogger had problem : ${err.response.data.error.message}`,
+      //     };
+      //   });
+
+      result = { isOk: true, message: `Start Time :` };
+
+      return result;
+    } else {
+      console.log(
+        "---------------- !!! Reject !!! ---------------------------"
+      );
+      console.log("--------> link: ", link);
+      console.log(
+        "---------------- Reject link because not have image ---------------------------"
+      );
+      console.log(
+        "********************************************************************"
+      );
+      return { isOk: false, message: `${link} : \n Data Error` };
+    }
+  }
+}
+
+// <<<--------------- Read and Write file Json  ---------------
 
 async function writeDataToJson(newTime) {
   startTime = newTime;
@@ -31,36 +394,88 @@ async function readDataFromJson() {
   startTime = dataENV.startTime;
 }
 
-// --------------- not change --------------------------
+// --------------- End Read and Write file Json  ---------------
+
+// <<<---------------- Authentication Google ----------------
+
+async function connectToGoogle() {
+  await readDataFromJson();
+  var scopesGoogle =
+    googleDriveFolderID == ""
+      ? ["https://www.googleapis.com/auth/blogger"]
+      : [
+          "https://www.googleapis.com/auth/drive",
+          "https://www.googleapis.com/auth/blogger",
+        ];
+  const auth = await authenticate({
+    keyfilePath: path.join(__dirname, "credentials.json"),
+    scopes: scopesGoogle,
+  }).catch((err) => {
+    console.log("error : ", err);
+  });
+
+  google.options({ auth });
+
+  if (openAPIKey) {
+    const configuration = new Configuration({
+      apiKey: openAPIKey,
+    });
+    openai = new OpenAIApi(configuration);
+  }
+}
+
+// <<<--------------- not change --------------------------
 
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, "../my-app/build")));
 
-// app.get('/api/users', (req, res) => {
-//   console.log('api/users called!')
-//   res.json(users);
-// });
+// get google account status
 
-app.get("/api/users", async (req, res) => {
-  await readDataFromJson();
-  // await writeDataToJson("2023-02-27T21:40:36+09:00");
-  res.json(blogId);
+app.get("/api/googlestatus", async (req, res) => {
+  //console.log("scope: ", google._options.auth);
+  const isOk = google._options.auth !== undefined;
+  res.json(isOk);
 });
 
-app.post("/api/user", (req, res) => {
-  const user = req.body.user;
-  console.log("Adding user:::::", user);
-  users.push(user);
-  res.json("user addedd");
+// connect to google account
+
+app.get("/api/connectgoogle", async (req, res) => {
+  await connectToGoogle();
+  res.json(true);
+});
+
+// post all link from page
+
+app.post("/api/getalllinkfrompage", async (req, res) => {
+  const inputParam = req.body.inputParam;
+  await getAllLinkInPage_thebestcatpage(
+    inputParam.link,
+    inputParam.domainID
+  ).then((result) => {
+    res.json(result);
+  });
 });
 
 // post to blog
 
-app.post("/api/blogspot", (req, res) => {
+app.post("/api/singerlinktoblogspot", async (req, res) => {
   const inputParam = req.body.inputParam;
   console.log("param push input :::::", inputParam);
-  res.json("user addedd");
+  //link,isUsingOpenAPI, isUsingDrive, startTime, tag
+  await post1Link(
+    inputParam.linkDemo,
+    inputParam.usingGPT,
+    inputParam.uploadImage,
+    inputParam.timePost,
+    inputParam.tag,
+    inputParam.domainID
+  ).then((result) => {
+    res.json(result);
+  });
+  // res.json("posted !!!");
 });
+
+//  --------------- not change --------------------------z
 
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "../my-app/build/index.html"));
