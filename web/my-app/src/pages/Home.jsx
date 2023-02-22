@@ -193,6 +193,14 @@ const Home = () => {
   const [dataItem, setDataItem] = React.useState(<></>);
 
   const updateRunType = (event, type) => {
+    if (type == 0) {
+      setAllLinkStatus({
+        show: false,
+        isOk: true,
+        message: "",
+        data: null,
+      });
+    }
     setRuntype(runTypeData[type]);
   };
 
@@ -317,6 +325,12 @@ const Home = () => {
                 });
                 setDataShow([]);
                 setLinkDemo("");
+                setAllLinkStatus({
+                  show: false,
+                  isOk: true,
+                  message: "",
+                  data: null,
+                });
               }}
               className={"h-[50px]"}
             >
@@ -353,6 +367,12 @@ const Home = () => {
                 });
                 setDataShow([]);
                 setLinkPage("");
+                setAllLinkStatus({
+                  show: false,
+                  isOk: true,
+                  message: "",
+                  data: null,
+                });
               }}
               className={"h-[50px]"}
             >
@@ -685,7 +705,7 @@ const Home = () => {
                                         tag: tag,
                                         timePost: formatRFC3339(timeToPost),
                                         domainID: domain.id,
-                                      // eslint-disable-next-line no-loop-func
+                                        // eslint-disable-next-line no-loop-func
                                       }).then((e) => {
                                         var msg = `${
                                           e.message
@@ -701,7 +721,7 @@ const Home = () => {
                                           },
                                         ]);
                                       });
-                                      timeToPost = addHours(timeToPost, 4);
+                                      timeToPost = addHours(timeToPost, intervalBetweenPostTime.time);
                                       await new Promise((r) => {
                                         setTimeout(r, 1 * 1000);
                                       });
@@ -821,7 +841,7 @@ const Home = () => {
                                     tag: tag,
                                     timePost: formatRFC3339(timeToPost),
                                     domainID: domain.id,
-                                  // eslint-disable-next-line no-loop-func
+                                    // eslint-disable-next-line no-loop-func
                                   }).then((e) => {
                                     var msg = `${
                                       e.message

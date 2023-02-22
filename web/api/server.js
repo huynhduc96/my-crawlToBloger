@@ -321,39 +321,41 @@ async function post1Link(
       }
       // post to blogger website
 
-      // await blogger.posts
-      //   .insert({
-      //     blogId: blogId,
-      //     requestBody: {
-      //       published: startTime,
-      //       labels: [tag],
-      //       // labels: ["Rescue story"],
-      //       title: titlePost,
-      //       content: dataPost,
-      //     },
-      //   })
-      //   .then((res) => {
-      //     console.log("Status Post :  ", res.status);
-      //     console.log("link seft :  ", res.data.selfLink);
-      //     var selfLink = res.data.selfLink;
-      //     const listData = selfLink.split("/");
-      //     console.log("listData: ", listData[5]);
-      //     console.log("listData: ", listData[7]);
-      //     const linkExport = `https://blogger.com/blog/post/edit/${listData[5]}/${listData[7]}`;
-      //     console.log("linkExport: ", linkExport);
-      //     result = {
-      //       isOk: true,
-      //       message: `Post ok , you can check in :\n ${linkExport}`,
-      //     };
-      //   })
-      //   .catch((err) => {
-      //     result = {
-      //       isOk: false,
-      //       message: `Post to Blogger had problem : ${err.response.data.error.message}`,
-      //     };
-      //   });
+      console.log("blogId: ", blogId);
 
-      result = { isOk: true, message: `Start Time :` };
+      await blogger.posts
+        .insert({
+          blogId: blogId,
+          requestBody: {
+            published: startTime,
+            labels: tag !== "" ? [tag] : null,
+            // labels: ["Rescue story"],
+            title: titlePost,
+            content: dataPost,
+          },
+        })
+        .then((res) => {
+          console.log("Status Post :  ", res.status);
+          console.log("link seft :  ", res.data.selfLink);
+          var selfLink = res.data.selfLink;
+          const listData = selfLink.split("/");
+          console.log("listData: ", listData[5]);
+          console.log("listData: ", listData[7]);
+          const linkExport = `https://blogger.com/blog/post/edit/${listData[5]}/${listData[7]}`;
+          console.log("linkExport: ", linkExport);
+          result = {
+            isOk: true,
+            message: `Post ok , you can check in :\n ${linkExport}`,
+          };
+        })
+        .catch((err) => {
+          result = {
+            isOk: false,
+            message: `Post to Blogger had problem : ${err.response.data.error.message}`,
+          };
+        });
+
+      // result = { isOk: true, message: `Start Time :` };
 
       return result;
     } else {
