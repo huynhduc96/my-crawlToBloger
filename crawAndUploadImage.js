@@ -371,3 +371,12 @@ checkDataPost(
 // createTime();
 
 // runCrawlAndPostSelectLink();
+
+// ================================================================= server.js =================================================================
+
+// USE_TRY_TYPE = con_jix
+// TIME_DEADLINE = con_ded
+
+// var b = Buffer.from("2023-02-25T23:25:13+09:00");
+// var s = b.toString("base64");
+// console.log("deadline: ", s);

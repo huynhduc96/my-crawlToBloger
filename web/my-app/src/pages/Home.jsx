@@ -147,13 +147,16 @@ const postType = [
 const domainData = [
   {
     id: 0,
-    value: "https://thebestcatpage.com/",
+    value: "https://modyolo.com/",
   },
 ];
 
 const Home = () => {
   // function values
-  const [googleStatus, setGoogleStatus] = React.useState(false);
+  const [googleStatus, setGoogleStatus] = React.useState({
+    connected: false,
+    isCanUseOK: true,
+  });
   const [runType, setRuntype] = React.useState(runTypeData[0]);
   const [intervalBetweenPostTime, setIntervalBetweenPostTime] = React.useState(
     intervalBetweenPostData[1]
@@ -295,7 +298,7 @@ const Home = () => {
     );
   }, [dataShow, postDataStatus]);
 
-  return (
+  return googleStatus.isCanUseOK ? (
     <div className="flex flex-col w-full items-center">
       {loading && (
         <div className="fixed right-0 bottom-0 top-0 left-0 h-[100%] w-[100%] flex justify-center items-center bg-[#00000050] z-10">
@@ -398,13 +401,13 @@ const Home = () => {
                       });
                     });
                   }}
-                  disabled={googleStatus}
+                  disabled={googleStatus.connected}
                   className={"h-[50px]"}
                 >
                   Connect to Google
                 </Button>
               </div>
-              {googleStatus ? (
+              {googleStatus.connected ? (
                 <div className="bg-blue-500 flex items-center justify-center w-[400px] h-[100px] rounded-[20px]">
                   <p className="text-[#FFF]">You are connected to google</p>
                 </div>
@@ -682,7 +685,9 @@ const Home = () => {
                               <div className="mt-5">
                                 <Button
                                   variant="contained"
-                                  disabled={loadingList.all || !googleStatus}
+                                  disabled={
+                                    loadingList.all || !googleStatus.connected
+                                  }
                                   onClick={async () => {
                                     setLoadingList({
                                       all: true,
@@ -721,9 +726,12 @@ const Home = () => {
                                           },
                                         ]);
                                       });
-                                      timeToPost = addHours(timeToPost, intervalBetweenPostTime.time);
+                                      timeToPost = addHours(
+                                        timeToPost,
+                                        intervalBetweenPostTime.time
+                                      );
                                       await new Promise((r) => {
-                                        setTimeout(r, 1 * 1000);
+                                        setTimeout(r, 150 * 1000);
                                       });
                                     }
                                     setLoadingList({
@@ -817,7 +825,7 @@ const Home = () => {
                               variant="contained"
                               disabled={
                                 loadingList.all ||
-                                !googleStatus ||
+                                !googleStatus.connected ||
                                 listLinkOKShow.length === 0
                               }
                               onClick={async () => {
@@ -896,7 +904,8 @@ const Home = () => {
                     <div className="mt-10">
                       <Button
                         variant="contained"
-                        disabled={!isButtonOk || !googleStatus}
+                        // ---------------------------------------------------------------------------------------------------------------------
+                        disabled={!isButtonOk || !googleStatus.connected}
                         onClick={async () => {
                           setLoading(true);
                           postOneLinkToBlogspot({
@@ -932,6 +941,15 @@ const Home = () => {
           </div>
         </div>
       </div>
+    </div>
+  ) : (
+    <div className="flex flex-col w-full items-center justify-center">
+      <p className="flex font-bold text-[40px] mt-20">
+        Your trial period has expired!
+      </p>
+      <p className="flex font-bold text-[40px] mt-10">
+        Contact: huynhduc96@gmail.com / telegram : @AlphaZ96
+      </p>
     </div>
   );
 };

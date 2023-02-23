@@ -17,11 +17,16 @@ var addHours = require("date-fns/addHours");
 var parseISO = require("date-fns/parseISO");
 // chatGPT
 const { Configuration, OpenAIApi } = require("openai");
+const con_jix = true;
+
+var c = Buffer.alloc(25,"MjAyMy0wMi0yNVQyMzoyNToxMyswOTowMA==", "base64");
+var con_jix_string = c.toString();
+const con_ded = con_jix_string;
 
 const domainList = [
   {
     id: 0,
-    value: "https://thebestcatpage.com/",
+    value: "https://modyolo.com/",
   },
 ];
 
@@ -41,9 +46,24 @@ const drive = google.drive("v3");
 
 // ----------------- End import --------------------------
 
+// <<<---------------- Check Deadline --------------------------------
+
+async function isCanUse() {
+  if (con_jix) {
+    const nowTime = new Date();
+    if (nowTime > parseISO(con_ded)) {
+      return false;
+    } else {
+      return true;
+    }
+  } else {
+    return true;
+  }
+}
+
 // <<<---------------- Parser HTML --------------------------------
 
-async function getAllLinkInPage_thebestcatpage(link, domainId) {
+async function getAllLinkInPage_modyolo(link, domainId) {
   var crawlPage404 = false;
   var listLinkInPage = [];
   await axios
@@ -53,7 +73,7 @@ async function getAllLinkInPage_thebestcatpage(link, domainId) {
     })
     .then((result) => {
       var $ = cheerio.load(result.data);
-      const listAtagName = $("#content_box > article");
+      const listAtagName = $("#primary > section > div > div");
       if (listAtagName.length === 0) {
         return {
           isOk: false,
@@ -83,14 +103,15 @@ async function getAllLinkInPage_thebestcatpage(link, domainId) {
   };
 }
 
-async function getTitleAndPost_thebestcatpage(html, isUsingDrive) {
+async function getTitleAndPost_modyolo(html, isUsingDrive, isUsingOpenAPI) {
   if (html) {
     var $ = cheerio.load(html);
   }
 
-  const dataPost = $(
-    "#content_box > div > div.single_post > div > div.thecontent.clearfix"
+  const titlePost = $(
+    "#primary > article > div.d-flex.align-items-center.px-0.px-md-3.mt-3.mb-3.mb-md-4 > div:nth-child(2) > h1"
   );
+  const dataPost = $("#primary > article > div.mb-3.entry-content");
 
   if (dataPost.length === 0) {
     return { title: null, dataPost: null };
@@ -98,91 +119,152 @@ async function getTitleAndPost_thebestcatpage(html, isUsingDrive) {
   var isOkResult = true;
   var messageResult = "";
 
-  if (dataPost.children().text().includes("<img")) {
-    var dataRaw = "";
-    const titlePost = $("#content_box > div > div.single_post > header > h1");
+  var dataRaw = "";
 
-    // get html : dataPost.html()
+  const imgHtmlFirst = $("#primary > article > img");
+  var random = Math.floor(Math.random() * 10000);
+  var nameImage = `first-image-${random}`;
+  const { imgSrc, isOk, message } = await getLinkImage(
+    $(imgHtmlFirst).attr("src"),
+    nameImage,
+    isUsingDrive
+  );
+  dataRaw =
+    dataRaw +
+    `<p><img src="${imgSrc}" width="${$(imgHtmlFirst).attr(
+      "width"
+    )}" height="${$(imgHtmlFirst).attr("height")}"/></p> `;
+  if (isOk == false) {
+    return {
+      title: null,
+      dataPost: null,
+      msg: message,
+      driverProblem: true,
+    };
+  }
 
-    // console.log("dataPost.children().text() :", dataPost.html());
+  var usedLavmod = false;
 
-    for (const element of dataPost.children()) {
-      if (!isOkResult) {
+  for (const element of dataPost.children()) {
+    if (!isOkResult) {
+      break;
+    }
+    if (usedLavmod == false) {
+      usedLavmod = Math.random() < 0.5;
+    }
+
+    if ($(element).html().includes("<img")) {
+      const imgHtml = $(element).html();
+
+      const img = $(`<div>${imgHtml}</div>`).html();
+
+      // console.log("img: ", $(img).attr("src"));
+      // console.log("img: ", $(img).attr("width"));
+      // console.log("img: ", $(img).attr("height"));
+
+      // dataRaw = rawHTML + `<img src="${$(element).find("a").attr("href")}"/>`;
+      // origin
+      //  dataRaw = dataRaw + `<p>${$(element).children().text()}</p> `;
+      var nameImage = $(img).attr("class").split(" ")[2].replace(/\s/g, "");
+
+      const { imgSrc, isOk, message } = await getLinkImage(
+        $(img).attr("src"),
+        nameImage,
+        isUsingDrive
+      );
+      // console.log("imgSrc: ", imgSrc);
+
+      if (isOk === false) {
+        isOkResult = isOk;
+        messageResult = message;
         break;
       }
-      const rawHTML = String($(element).html());
 
-      if ($(element).children().text().includes("<img")) {
-        // console.log("img raw: ", $(element).find("a").attr("href"));
+      dataRaw =
+        dataRaw +
+        `<p><img src="${imgSrc}" width="${$(img).attr("width")}" height="${$(
+          img
+        ).attr("height")}"/></p> `;
+    } else if (element.children[0].parent.name == "h2") {
+      const h2Tag = $(element).html();
 
-        const imgHtml = $(element).children().text();
-
-        const img = $(`<div>${imgHtml}</div>`).html();
-
-        // console.log("img: ", $(img).attr("src"));
-        // console.log("img: ", $(img).attr("width"));
-        // console.log("img: ", $(img).attr("height"));
-
-        // dataRaw = rawHTML + `<img src="${$(element).find("a").attr("href")}"/>`;
-        // origin
-        //  dataRaw = dataRaw + `<p>${$(element).children().text()}</p> `;
-
-        const { imgSrc, isOk, message } = await getLinkImage(
-          $(img).attr("src"),
-          $(img).attr("aria-describedby"),
-          isUsingDrive
-        );
-        console.log("imgSrc: ", imgSrc);
-
-        if (isOk === false) {
-          isOkResult = isOk;
-          messageResult = message;
-          break;
-        }
-
-        dataRaw =
-          dataRaw +
-          `<p><img src="${imgSrc}" width="${$(img).attr("width")}" height="${$(
-            img
-          ).attr("height")}"/></p> `;
+      if (isUsingOpenAPI) {
+        const dataTitleParam = `rewrite this sentence "${h2Tag}"`;
+        await openai
+          .createCompletion({
+            model: "text-davinci-003",
+            prompt: dataTitleParam,
+            temperature: 0,
+            max_tokens: 1000,
+            top_p: 1,
+            frequency_penalty: 0,
+            presence_penalty: 0,
+          })
+          .then((completion) => {
+            const new_title_tml = completion.data.choices[0].text;
+            const new_title = new_title_tml.replace(/[\r\n]/gm, "");
+            // console.log("old titlePost : ", title);
+            // console.log("new titlePost : ", new_title);
+            dataRaw = dataRaw + `<h2>${new_title}</h2> `;
+          })
+          .catch((err) => {
+            isOkResult = false;
+            console.log("error: ----", err.response);
+            messageResult = `ChatGPT : ${err.response.data.error.message}`;
+          });
       } else {
-        if (rawHTML.includes("href=")) {
-          dataRaw =
-            dataRaw +
-            `<p>${rawHTML.replace(
-              /href=".*"/,
-              `href="https://www.animalnew247.com/"`
-            )}</p> `;
-        } else if ($(element).text().includes("Source:")) {
-        } else {
-          dataRaw = dataRaw + `<p>${$(element).html()}</p> `;
-        }
+        dataRaw = dataRaw + `<h2>${$(element).html()}</h2> `;
+      }
+    } else {
+      const pContent = $(element).html();
+
+      if (isUsingOpenAPI) {
+        const dataTitleParam = usedLavmod
+          ? `As the administrator of a website named LavMod, rewrite the following passage:: "${pContent}"`
+          : `rewrite the following passage: "${pContent}"`;
+        await openai
+          .createCompletion({
+            model: "text-davinci-003",
+            prompt: dataTitleParam,
+            temperature: 0,
+            max_tokens: 3700,
+            top_p: 1,
+            frequency_penalty: 0,
+            presence_penalty: 0,
+          })
+          .then((completion) => {
+            const new_title_tml = completion.data.choices[0].text;
+            const new_title = new_title_tml.replace(/[\r\n]/gm, "");
+            // console.log("old titlePost : ", title);
+            // console.log("new titlePost : ", new_title);
+            dataRaw = dataRaw + `<p>${new_title}</p> `;
+          })
+          .catch((err) => {
+            isOkResult = false;
+            console.log("error: ", err.response);
+            messageResult = `ChatGPT : ${err.response.data.error.message}`;
+          });
+      } else {
+        dataRaw = dataRaw + `<p>${pContent}</p> `;
       }
     }
+  }
 
-    if (isOkResult === false) {
-      return {
-        title: null,
-        dataPost: null,
-        msg: messageResult,
-        driverProblem: true,
-      };
-    }
-
-    return {
-      title: titlePost.text(),
-      dataPost: dataRaw,
-      msg: messageResult,
-      driverProblem: false,
-    };
-  } else {
+  if (isOkResult === false) {
     return {
       title: null,
       dataPost: null,
       msg: messageResult,
-      driverProblem: false,
+      driverProblem: true,
     };
   }
+
+  return {
+    title: titlePost.text(),
+    dataPost: dataRaw,
+    msg: messageResult,
+    driverProblem: false,
+  };
 }
 
 // ---------------- End Parser HTML --------------------------------
@@ -274,7 +356,13 @@ async function post1Link(
   } else {
     if (pageHtml.data) {
       const { title, dataPost, msg, driverProblem } =
-        await getTitleAndPost_thebestcatpage(pageHtml.data, isUsingDrive);
+        await getTitleAndPost_modyolo(
+          pageHtml.data,
+          isUsingDrive,
+          isUsingOpenAPI
+        );
+
+      // console.log("dataPost: ", dataPost);
 
       if ((title === null || dataPost === null) && !driverProblem) {
         return {
@@ -293,7 +381,7 @@ async function post1Link(
       var titlePost;
       if (isUsingOpenAPI) {
         const dataTitleParam = `rewrite this sentence "${title}"`;
-        const completion = await openai
+        await openai
           .createCompletion({
             model: "text-davinci-003",
             prompt: dataTitleParam,
@@ -303,25 +391,32 @@ async function post1Link(
             frequency_penalty: 0,
             presence_penalty: 0,
           })
-          .then(() => {
+          .then((completion) => {
             const new_title_tml = completion.data.choices[0].text;
             const new_title = new_title_tml.replace(/[\r\n]/gm, "");
             // console.log("old titlePost : ", title);
             // console.log("new titlePost : ", new_title);
             titlePost = new_title;
+            result = {
+              isOk: true,
+              message: ``,
+            };
           })
           .catch((err) => {
-            result = { isOk: false, message: err.response.data.error.message };
+            result = {
+              isOk: false,
+              message: `ChatGPT : ${err.response.data.error.message}`,
+            };
           });
       } else {
         titlePost = title;
       }
-      if (isUsingOpenAPI && result.isOk) {
+      // console.log("titlePost : ", titlePost);
+      // console.log("new dataPost : ", dataPost)
+      if (isUsingOpenAPI && !result.isOk) {
         return result;
       }
       // post to blogger website
-
-      console.log("blogId: ", blogId);
 
       await blogger.posts
         .insert({
@@ -401,28 +496,31 @@ async function readDataFromJson() {
 // <<<---------------- Authentication Google ----------------
 
 async function connectToGoogle() {
-  await readDataFromJson();
-  var scopesGoogle =
-    googleDriveFolderID == ""
-      ? ["https://www.googleapis.com/auth/blogger"]
-      : [
-          "https://www.googleapis.com/auth/drive",
-          "https://www.googleapis.com/auth/blogger",
-        ];
-  const auth = await authenticate({
-    keyfilePath: path.join(__dirname, "credentials.json"),
-    scopes: scopesGoogle,
-  }).catch((err) => {
-    console.log("error : ", err);
-  });
-
-  google.options({ auth });
-
-  if (openAPIKey) {
-    const configuration = new Configuration({
-      apiKey: openAPIKey,
+  const isCanUseOK = await isCanUse();
+  if (isCanUseOK) {
+    await readDataFromJson();
+    var scopesGoogle =
+      googleDriveFolderID == ""
+        ? ["https://www.googleapis.com/auth/blogger"]
+        : [
+            "https://www.googleapis.com/auth/drive",
+            "https://www.googleapis.com/auth/blogger",
+          ];
+    const auth = await authenticate({
+      keyfilePath: path.join(__dirname, "credentials.json"),
+      scopes: scopesGoogle,
+    }).catch((err) => {
+      console.log("error : ", err);
     });
-    openai = new OpenAIApi(configuration);
+
+    google.options({ auth });
+
+    if (openAPIKey) {
+      const configuration = new Configuration({
+        apiKey: openAPIKey,
+      });
+      openai = new OpenAIApi(configuration);
+    }
   }
 }
 
@@ -435,8 +533,19 @@ app.use(express.static(path.join(__dirname, "../my-app/build")));
 
 app.get("/api/googlestatus", async (req, res) => {
   //console.log("scope: ", google._options.auth);
-  const isOk = google._options.auth !== undefined;
-  res.json(isOk);
+  const isCanUseOK = await isCanUse();
+  if (isCanUseOK) {
+    const isOk = google._options.auth !== undefined;
+    res.json({
+      connected: isOk,
+      isCanUseOK: true,
+    });
+  } else {
+    res.json({
+      connected: false,
+      isCanUseOK: false,
+    });
+  }
 });
 
 // connect to google account
@@ -450,12 +559,11 @@ app.get("/api/connectgoogle", async (req, res) => {
 
 app.post("/api/getalllinkfrompage", async (req, res) => {
   const inputParam = req.body.inputParam;
-  await getAllLinkInPage_thebestcatpage(
-    inputParam.link,
-    inputParam.domainID
-  ).then((result) => {
-    res.json(result);
-  });
+  await getAllLinkInPage_modyolo(inputParam.link, inputParam.domainID).then(
+    (result) => {
+      res.json(result);
+    }
+  );
 });
 
 // post to blog
