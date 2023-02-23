@@ -328,6 +328,7 @@ const Home = () => {
                 });
                 setDataShow([]);
                 setLinkDemo("");
+                setSelectedInput("");
                 setAllLinkStatus({
                   show: false,
                   isOk: true,
