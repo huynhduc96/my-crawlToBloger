@@ -26,7 +26,7 @@ const con_ded = con_jix_string;
 const domainList = [
   {
     id: 0,
-    value: "https://modyolo.com/",
+    value: "https://www.motorauthority.com",
   },
 ];
 
@@ -63,7 +63,7 @@ async function isCanUse() {
 
 // <<<---------------- Parser HTML --------------------------------
 
-async function getAllLinkInPage_modyolo(link, domainId) {
+async function getAllLinkInPage_motorauthority(link, domainId) {
   var crawlPage404 = false;
   var listLinkInPage = [];
   await axios
@@ -73,7 +73,9 @@ async function getAllLinkInPage_modyolo(link, domainId) {
     })
     .then((result) => {
       var $ = cheerio.load(result.data);
-      const listAtagName = $("#primary > section > div > div");
+      const listAtagName = $(
+        "#main > div.two-column > div.content-wrap > div.article-list > ul > li"
+      );
       if (listAtagName.length === 0) {
         return {
           isOk: false,
@@ -86,7 +88,9 @@ async function getAllLinkInPage_modyolo(link, domainId) {
 
       listAtagName.each((index, element) => {
         var linkInPage = $(element).children("a").attr("href");
-        listLinkInPage.push(linkInPage);
+        if (linkInPage !== undefined) {
+          listLinkInPage.push(`${domainList[domainId].value}${linkInPage}`);
+        }
       });
     })
     .catch((error) => {
@@ -103,15 +107,22 @@ async function getAllLinkInPage_modyolo(link, domainId) {
   };
 }
 
-async function getTitleAndPost_modyolo(html, isUsingDrive, isUsingOpenAPI) {
+async function getTitleAndPost_motorauthority(
+  html,
+  isUsingDrive,
+  isUsingOpenAPI
+) {
   if (html) {
     var $ = cheerio.load(html);
   }
 
-  const titlePost = $(
-    "#primary > article > div.d-flex.align-items-center.px-0.px-md-3.mt-3.mb-3.mb-md-4 > div:nth-child(2) > h1"
+  const titlePost = $("head > title");
+  const dataPost = $(
+    "#main > div.article-block > div > div.left-col > article > section.article-body"
   );
-  const dataPost = $("#primary > article > div.mb-3.entry-content");
+
+  // console.log("titlePost: ", titlePost.html());
+  // console.log("dataPost: ", dataPost.html());
 
   if (dataPost.length === 0) {
     return { title: null, dataPost: null };
@@ -121,19 +132,17 @@ async function getTitleAndPost_modyolo(html, isUsingDrive, isUsingOpenAPI) {
 
   var dataRaw = "";
 
-  const imgHtmlFirst = $("#primary > article > img");
+  // ------------------------------- Get first image ----------------------------
+
+  const imgHtmlFirst = $("#main > div.article-block > section");
   var random = Math.floor(Math.random() * 10000);
   var nameImage = `first-image-${random}`;
   const { imgSrc, isOk, message } = await getLinkImage(
-    $(imgHtmlFirst).attr("src"),
+    $(imgHtmlFirst).attr("data-image-src-h"),
     nameImage,
     isUsingDrive
   );
-  dataRaw =
-    dataRaw +
-    `<p><img src="${imgSrc}" width="${$(imgHtmlFirst).attr(
-      "width"
-    )}" height="${$(imgHtmlFirst).attr("height")}"/></p> `;
+  dataRaw = dataRaw + `<p><img src="${imgSrc}"/></p> `;
   if (isOk == false) {
     return {
       title: null,
@@ -142,6 +151,8 @@ async function getTitleAndPost_modyolo(html, isUsingDrive, isUsingOpenAPI) {
       driverProblem: true,
     };
   }
+
+  // ----------------------------------------------------------------
 
   var usedLavmod = false;
   var runed = false;
@@ -152,149 +163,134 @@ async function getTitleAndPost_modyolo(html, isUsingDrive, isUsingOpenAPI) {
     }
     if (!usedLavmod) {
       usedLavmod = Math.random() < 0.5;
-      console.log("usedLavmod: ", usedLavmod);
     }
 
-    if ($(element).html().includes("<img")) {
-      const imgHtml = $(element).html();
+    if (element.children[0] !== undefined) {
+      if (element.children[0].parent.name !== "span") {
+        if (element.children[0].parent.name === "p") {
+          var pContent = $(element).text();
 
-      const img = $(`<div>${imgHtml}</div>`).html();
-
-      // console.log("img: ", $(img).attr("src"));
-      // console.log("img: ", $(img).attr("width"));
-      // console.log("img: ", $(img).attr("height"));
-
-      // dataRaw = rawHTML + `<img src="${$(element).find("a").attr("href")}"/>`;
-      // origin
-      //  dataRaw = dataRaw + `<p>${$(element).children().text()}</p> `;
-
-      var imgList = $(element).find("table > tbody > tr > td > img");
-
-      if (imgList.length > 0) {
-        var listImageHTML = [];
-        var dataRawTmp = `<div style="
-        display: flex;
-        justify-content: space-between;">`;
-        for (var imgItem of imgList) {
-          const imgNode = imgItem.attribs;
-          var nameImage = imgNode.class.split(" ")[2].replace(/\s/g, "");
-          const { imgSrc, isOk, message } = await getLinkImage(
-            imgNode.src,
-            nameImage,
-            isUsingDrive
-          );
-          // console.log("imgSrc: ", imgSrc);
-
-          if (isOk === false) {
-            isOkResult = isOk;
-            messageResult = message;
-            break;
+          if (isUsingOpenAPI) {
+            const dataTitleParam =
+              usedLavmod && !runed
+                ? `As the administrator of a website named "Motorauthority", rewrite the following passage:: "${pContent}"`
+                : `rewrite the following passage: "${pContent}"`;
+            if (usedLavmod && !runed) {
+              runed = true;
+            }
+            await openai
+              .createCompletion({
+                model: "text-davinci-003",
+                prompt: dataTitleParam,
+                temperature: 0,
+                max_tokens: 3700,
+                top_p: 1,
+                frequency_penalty: 0,
+                presence_penalty: 0,
+              })
+              .then((completion) => {
+                const new_title_tml = completion.data.choices[0].text;
+                const new_title = new_title_tml.replace(/[\r\n]/gm, "");
+                // console.log("old titlePost : ", title);
+                // console.log("new titlePost : ", new_title);
+                dataRaw = dataRaw + `<p>${new_title}</p> `;
+              })
+              .catch((err) => {
+                isOkResult = false;
+                console.log("error: ", err.response);
+                messageResult = `ChatGPT : ${err.response.data.error.message}`;
+              });
+          } else {
+            dataRaw = dataRaw + `<p>${pContent}</p> `;
           }
+        } else if (element.children[0].parent.name === "h3") {
+          const h2Tag = $(element).text();
 
-          const imgHtmlRaw = `<img src="${imgSrc}" width="${imgNode.width}px" height="${imgNode.height}px"/>`;
-          listImageHTML.push(imgHtmlRaw);
+          if (isUsingOpenAPI) {
+            const dataTitleParam = `rewrite this sentence "${h2Tag}"`;
+            await openai
+              .createCompletion({
+                model: "text-davinci-003",
+                prompt: dataTitleParam,
+                temperature: 0,
+                max_tokens: 1000,
+                top_p: 1,
+                frequency_penalty: 0,
+                presence_penalty: 0,
+              })
+              .then((completion) => {
+                const new_title_tml = completion.data.choices[0].text;
+                const new_title = new_title_tml.replace(/[\r\n]/gm, "");
+                // console.log("old titlePost : ", title);
+                // console.log("new titlePost : ", new_title);
+                dataRaw = dataRaw + `<h2>${new_title}</h2> `;
+              })
+              .catch((err) => {
+                isOkResult = false;
+                console.log("error: ----", err.response);
+                messageResult = `ChatGPT : ${err.response.data.error.message}`;
+              });
+          } else {
+            dataRaw = dataRaw + `<h2>${$(element).html()}</h2> `;
+          }
+        } else if (element.children[0].parent.name === "div") {
+          var listImg = $(element).find("div > img");
+          if (listImg.length > 0) {
+            for (var i = 0; i < listImg.length; i++) {
+              var item = listImg[i];
+              var src = $(item).attr("data-url");
+              var name = $(item).attr("name");
+              const { imgSrc, isOk, message } = await getLinkImage(
+                src,
+                name,
+                isUsingDrive
+              );
+              if (isOk === false) {
+                isOkResult = isOk;
+                messageResult = message;
+                break;
+              }
+              dataRaw = dataRaw + `<p><img src="${imgSrc}"/></p> `;
+            }
+          }
         }
-
-        for (var htmlRaw of listImageHTML) {
-          const percentset = 100 / listImageHTML.length;
-          const htmlRawTmp = `<div style="max-width: ${percentset}%;">${htmlRaw}</div>`;
-          dataRawTmp = `${dataRawTmp} ${htmlRawTmp}`;
-        }
-        dataRawTmp = `${dataRawTmp}</div>`;
-        dataRaw = dataRaw + dataRawTmp;
-      } else {
-        var nameImage = $(img).attr("class").split(" ")[2].replace(/\s/g, "");
-
-        // var random = Math.floor(Math.random() * 1000000);
-        // var nameImage = `body-image-${random}`;
-
-        const { imgSrc, isOk, message } = await getLinkImage(
-          $(img).attr("src"),
-          nameImage,
-          isUsingDrive
-        );
-        // console.log("imgSrc: ", imgSrc);
-
-        if (isOk === false) {
-          isOkResult = isOk;
-          messageResult = message;
-          break;
-        }
-
-        dataRaw =
-          dataRaw +
-          `<p><img src="${imgSrc}" width="${$(img).attr("width")}" height="${$(
-            img
-          ).attr("height")}"/></p> `;
-      }
-    } else if (element.children[0].parent.name == "h2") {
-      const h2Tag = $(element).html();
-
-      if (isUsingOpenAPI) {
-        const dataTitleParam = `rewrite this sentence "${h2Tag}"`;
-        await openai
-          .createCompletion({
-            model: "text-davinci-003",
-            prompt: dataTitleParam,
-            temperature: 0,
-            max_tokens: 1000,
-            top_p: 1,
-            frequency_penalty: 0,
-            presence_penalty: 0,
-          })
-          .then((completion) => {
-            const new_title_tml = completion.data.choices[0].text;
-            const new_title = new_title_tml.replace(/[\r\n]/gm, "");
-            // console.log("old titlePost : ", title);
-            // console.log("new titlePost : ", new_title);
-            dataRaw = dataRaw + `<h2>${new_title}</h2> `;
-          })
-          .catch((err) => {
-            isOkResult = false;
-            console.log("error: ----", err.response);
-            messageResult = `ChatGPT : ${err.response.data.error.message}`;
-          });
-      } else {
-        dataRaw = dataRaw + `<h2>${$(element).html()}</h2> `;
-      }
-    } else {
-      const pContent = $(element).html();
-
-      if (isUsingOpenAPI) {
-        const dataTitleParam =
-          usedLavmod && !runed
-            ? `As the administrator of a website named LavMod, rewrite the following passage:: "${pContent}"`
-            : `rewrite the following passage: "${pContent}"`;
-        if (usedLavmod && !runed) {
-          runed = true;
-        }
-        await openai
-          .createCompletion({
-            model: "text-davinci-003",
-            prompt: dataTitleParam,
-            temperature: 0,
-            max_tokens: 3700,
-            top_p: 1,
-            frequency_penalty: 0,
-            presence_penalty: 0,
-          })
-          .then((completion) => {
-            const new_title_tml = completion.data.choices[0].text;
-            const new_title = new_title_tml.replace(/[\r\n]/gm, "");
-            // console.log("old titlePost : ", title);
-            // console.log("new titlePost : ", new_title);
-            dataRaw = dataRaw + `<p>${new_title}</p> `;
-          })
-          .catch((err) => {
-            isOkResult = false;
-            console.log("error: ", err.response);
-            messageResult = `ChatGPT : ${err.response.data.error.message}`;
-          });
-      } else {
-        dataRaw = dataRaw + `<p>${pContent}</p> `;
       }
     }
   }
+
+  // ------------------------------- Get list image end ----------------------------
+
+  const imgSliderHTML = $(
+    "#main > div.article-block > div.article-wrap > div.left-col > div.highres-gallery > div.highres-gallery-wrapper"
+  );
+
+  if (imgSliderHTML.children().length > 0) {
+    for (var item of imgSliderHTML.children()) {
+      var listImgG = $(item).find("div > img");
+      var src = $(listImgG).attr("src");
+      var name = $(listImgG).attr("data-id");
+
+      const { imgSrc, isOk, message } = await getLinkImage(
+        src,
+        name,
+        isUsingDrive
+      );
+      if (imgSrc !== undefined) {
+        dataRaw = dataRaw + `<p><img src="${imgSrc}"/></p> `;
+      }
+
+      if (isOk == false) {
+        return {
+          title: null,
+          dataPost: null,
+          msg: message,
+          driverProblem: true,
+        };
+      }
+    }
+  }
+
+  // ----------------------------------------------------------------
 
   if (isOkResult === false) {
     return {
@@ -402,7 +398,7 @@ async function post1Link(
   } else {
     if (pageHtml.data) {
       const { title, dataPost, msg, driverProblem } =
-        await getTitleAndPost_modyolo(
+        await getTitleAndPost_motorauthority(
           pageHtml.data,
           isUsingDrive,
           isUsingOpenAPI
@@ -605,11 +601,12 @@ app.get("/api/connectgoogle", async (req, res) => {
 
 app.post("/api/getalllinkfrompage", async (req, res) => {
   const inputParam = req.body.inputParam;
-  await getAllLinkInPage_modyolo(inputParam.link, inputParam.domainID).then(
-    (result) => {
-      res.json(result);
-    }
-  );
+  await getAllLinkInPage_motorauthority(
+    inputParam.link,
+    inputParam.domainID
+  ).then((result) => {
+    res.json(result);
+  });
 });
 
 // post to blog
