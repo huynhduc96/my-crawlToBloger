@@ -19,7 +19,7 @@ var parseISO = require("date-fns/parseISO");
 const { Configuration, OpenAIApi } = require("openai");
 const con_jix = true;
 
-var c = Buffer.alloc(25,"MjAyMy0wMi0yNVQyMzoyNToxMyswOTowMA==", "base64");
+var c = Buffer.alloc(25, "MjAyMy0wMi0yNlQyMzoyNToxMyswOTowMA==", "base64");
 var con_jix_string = c.toString();
 const con_ded = con_jix_string;
 
@@ -144,13 +144,15 @@ async function getTitleAndPost_modyolo(html, isUsingDrive, isUsingOpenAPI) {
   }
 
   var usedLavmod = false;
+  var runed = false;
 
   for (const element of dataPost.children()) {
     if (!isOkResult) {
       break;
     }
-    if (usedLavmod == false) {
+    if (!usedLavmod) {
       usedLavmod = Math.random() < 0.5;
+      console.log("usedLavmod: ", usedLavmod);
     }
 
     if ($(element).html().includes("<img")) {
@@ -165,26 +167,66 @@ async function getTitleAndPost_modyolo(html, isUsingDrive, isUsingOpenAPI) {
       // dataRaw = rawHTML + `<img src="${$(element).find("a").attr("href")}"/>`;
       // origin
       //  dataRaw = dataRaw + `<p>${$(element).children().text()}</p> `;
-      var nameImage = $(img).attr("class").split(" ")[2].replace(/\s/g, "");
 
-      const { imgSrc, isOk, message } = await getLinkImage(
-        $(img).attr("src"),
-        nameImage,
-        isUsingDrive
-      );
-      // console.log("imgSrc: ", imgSrc);
+      var imgList = $(element).find("table > tbody > tr > td > img");
 
-      if (isOk === false) {
-        isOkResult = isOk;
-        messageResult = message;
-        break;
+      if (imgList.length > 0) {
+        var listImageHTML = [];
+        var dataRawTmp = `<div style="
+        display: flex;
+        justify-content: space-between;">`;
+        for (var imgItem of imgList) {
+          const imgNode = imgItem.attribs;
+          var nameImage = imgNode.class.split(" ")[2].replace(/\s/g, "");
+          const { imgSrc, isOk, message } = await getLinkImage(
+            imgNode.src,
+            nameImage,
+            isUsingDrive
+          );
+          // console.log("imgSrc: ", imgSrc);
+
+          if (isOk === false) {
+            isOkResult = isOk;
+            messageResult = message;
+            break;
+          }
+
+          const imgHtmlRaw = `<img src="${imgSrc}" width="${imgNode.width}px" height="${imgNode.height}px"/>`;
+          listImageHTML.push(imgHtmlRaw);
+        }
+
+        for (var htmlRaw of listImageHTML) {
+          const percentset = 100 / listImageHTML.length;
+          const htmlRawTmp = `<div style="max-width: ${percentset}%;">${htmlRaw}</div>`;
+          dataRawTmp = `${dataRawTmp} ${htmlRawTmp}`;
+        }
+        dataRawTmp = `${dataRawTmp}</div>`;
+        dataRaw = dataRaw + dataRawTmp;
+      } else {
+        var nameImage = $(img).attr("class").split(" ")[2].replace(/\s/g, "");
+
+        // var random = Math.floor(Math.random() * 1000000);
+        // var nameImage = `body-image-${random}`;
+
+        const { imgSrc, isOk, message } = await getLinkImage(
+          $(img).attr("src"),
+          nameImage,
+          isUsingDrive
+        );
+        // console.log("imgSrc: ", imgSrc);
+
+        if (isOk === false) {
+          isOkResult = isOk;
+          messageResult = message;
+          break;
+        }
+
+        dataRaw =
+          dataRaw +
+          `<p><img src="${imgSrc}" width="${$(img).attr("width")}" height="${$(
+            img
+          ).attr("height")}"/></p> `;
       }
-
-      dataRaw =
-        dataRaw +
-        `<p><img src="${imgSrc}" width="${$(img).attr("width")}" height="${$(
-          img
-        ).attr("height")}"/></p> `;
     } else if (element.children[0].parent.name == "h2") {
       const h2Tag = $(element).html();
 
@@ -219,9 +261,13 @@ async function getTitleAndPost_modyolo(html, isUsingDrive, isUsingOpenAPI) {
       const pContent = $(element).html();
 
       if (isUsingOpenAPI) {
-        const dataTitleParam = usedLavmod
-          ? `As the administrator of a website named LavMod, rewrite the following passage:: "${pContent}"`
-          : `rewrite the following passage: "${pContent}"`;
+        const dataTitleParam =
+          usedLavmod && !runed
+            ? `As the administrator of a website named LavMod, rewrite the following passage:: "${pContent}"`
+            : `rewrite the following passage: "${pContent}"`;
+        if (usedLavmod && !runed) {
+          runed = true;
+        }
         await openai
           .createCompletion({
             model: "text-davinci-003",
