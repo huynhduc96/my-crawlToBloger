@@ -147,7 +147,7 @@ const postType = [
 const domainData = [
   {
     id: 0,
-    value: "https://modyolo.com/",
+    value: "https://www.motorauthority.com/",
   },
 ];
 
@@ -346,7 +346,7 @@ const Home = () => {
       {loadingList.all && (
         <div className="fixed right-0 bottom-0 top-0 left-0 h-[100%] w-[100%] flex justify-center items-center bg-[#00000050] z-10">
           <div
-            className={`flex flex-col items-center justify-center p-5 rounded-[24px] border-[1px] border-blue-700  border-solid bg-[#fff] w-[800px]`}
+            className={`flex flex-col items-center justify-center p-5 rounded-[24px] border-[1px] border-blue-700  border-solid bg-[#fff] w-[800px] max-h-[2000px] overflow-y-scroll`}
           >
             {loadingList.onProcess && (
               <div className="flex w-full h-[100px] items-center justify-center">
@@ -896,6 +896,7 @@ const Home = () => {
                         label="Link 1 post"
                         variant="outlined"
                         className=" w-[400px]"
+                        value={linkDemo}
                         onChange={(e) => {
                           setLinkDemo(e.target.value);
                         }}
