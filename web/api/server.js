@@ -26,11 +26,11 @@ const con_ded = con_jix_string;
 const domainList = [
   {
     id: 0,
-    value: "https://www.motorauthority.com",
+    value: "https://my.hotnewsmm.xyz",
   },
   {
     id: 1,
-    value: "https://www.hotcars.com",
+    value: "https://thebestcatpage.com/",
   },
 ];
 
@@ -79,14 +79,10 @@ async function getAllLinkInPage(link, domainId) {
       var $ = cheerio.load(result.data);
       var listAtagName;
       if (domainId === 0) {
-        listAtagName = $(
-          "#main > div.two-column > div.content-wrap > div.article-list > ul > li"
-        );
+        listAtagName = $("#recent-content > div > h2");
       }
       if (domainId === 1) {
-        listAtagName = $(
-          "body > main > section.wrapper.w-listing.page1.listing-tag > div.w-grid-system.grid-content.listing > section > div.sentinel-listing-page-list.browse-half.clip-half > article.browse-clip > div > h3"
-        );
+        listAtagName = $("#content_box > article");
       }
       if (listAtagName.length === 0) {
         return {
@@ -101,7 +97,11 @@ async function getAllLinkInPage(link, domainId) {
       listAtagName.each((index, element) => {
         var linkInPage = $(element).children("a").attr("href");
         if (linkInPage !== undefined) {
-          listLinkInPage.push(`${domainList[domainId].value}${linkInPage}`);
+          if (domainId === 1) {
+            listLinkInPage.push(`${linkInPage}`);
+          }else {
+            listLinkInPage.push(`${domainList[domainId].value}${linkInPage}`);
+          }
         }
       });
     })
@@ -119,13 +119,13 @@ async function getAllLinkInPage(link, domainId) {
   };
 }
 
-async function getTitleAndPost_hotcars(html, isUsingDrive, isUsingOpenAPI) {
+async function getTitleAndPost_hotnewsmm(html, isUsingDrive, isUsingOpenAPI) {
   if (html) {
     var $ = cheerio.load(html);
   }
 
-  const titlePost = $("body > main > article > header > h1");
-  const dataPost = $("#article-body");
+  const titlePost = $("#main > article > header > h1");
+  const dataPost = $("#main > article > div.entry-content");
 
   // console.log("titlePost: ", titlePost.html());
   // console.log("dataPost: ", dataPost.html());
@@ -140,24 +140,27 @@ async function getTitleAndPost_hotcars(html, isUsingDrive, isUsingOpenAPI) {
 
   // ------------------------------- Get first image ----------------------------
 
-  const imgHtmlFirst = $(
-    "body > main > article > header > div.heading_image.responsive-img > figure > picture > img"
-  );
+  const imgHtmlFirst = $(`head > meta[property~="og:image"]`);
   if (imgHtmlFirst.length > 0) {
+    var src = $(imgHtmlFirst).attr("content");
+    var height = $(`head > meta[property~="og:image:height"]`).attr("content");
+    var width = $(`head > meta[property~="og:image:width"]`).attr("content");
     var random = Math.floor(Math.random() * 10000);
     var nameImage = `first-image-${random}`;
     const { imgSrc, isOk, message } = await getLinkImage(
-      $(imgHtmlFirst).attr("data-img-url"),
+      src,
       nameImage,
       isUsingDrive
     );
-    dataRaw = dataRaw + `<p><img src="${imgSrc}"/></p> `;
+    dataRaw =
+      dataRaw +
+      `<img style="display: none;" src="${imgSrc}" height="${height}" width="${width}" />`;
     if (isOk == false) {
       return {
-        title1: null,
-        dataPost1: null,
-        msg1: message,
-        driverProblem1: true,
+        title: null,
+        dataPost: null,
+        msg: message,
+        driverProblem: true,
       };
     }
   }
@@ -174,192 +177,37 @@ async function getTitleAndPost_hotcars(html, isUsingDrive, isUsingOpenAPI) {
     if (!usedLavmod) {
       usedLavmod = Math.random() < 0.5;
     }
-    if (element.children.length > 0) {
-      if (element.children[0] !== undefined) {
-        if (element.children[0].parent.name === "h2") {
-          const h2Tag = $(element).text();
-
-          if (isUsingOpenAPI) {
-            const dataTitleParam = `rewrite this sentence "${h2Tag}"`;
-            await openai
-              .createCompletion({
-                model: "text-davinci-003",
-                prompt: dataTitleParam,
-                temperature: 0,
-                max_tokens: 1000,
-                top_p: 1,
-                frequency_penalty: 0,
-                presence_penalty: 0,
-              })
-              .then((completion) => {
-                const new_title_tml = completion.data.choices[0].text;
-                const new_title = new_title_tml.replace(/[\r\n]/gm, "");
-                // console.log("old titlePost : ", title);
-                // console.log("new titlePost : ", new_title);
-                dataRaw = dataRaw + `<h2>${new_title}</h2> `;
-              })
-              .catch((err) => {
-                isOkResult = false;
-                console.log("error: ----", err.response);
-                messageResult = `ChatGPT : ${err.response.data.error.message}`;
-              });
-          } else {
-            dataRaw = dataRaw + `<h2>${$(element).html()}</h2> `;
-          }
-        } else {
-          if ($(element).html().includes("<img")) {
-            var listImg = $(element).find("div > figure > picture > img");
-            if (listImg.length > 0) {
-              for (var i = 0; i < listImg.length; i++) {
-                var item = listImg[i];
-                var src = $(item).attr("data-img-url");
-                var random = Math.floor(Math.random() * 10000);
-                var name = `body-image-${random}`;
-                const { imgSrc, isOk, message } = await getLinkImage(
-                  src,
-                  name,
-                  isUsingDrive
-                );
-                if (isOk === false) {
-                  isOkResult = isOk;
-                  messageResult = message;
-                  break;
-                }
-                dataRaw = dataRaw + `<p><img src="${imgSrc}"/></p> `;
-              }
-            }
-          } else if ($(element).html().includes("<iframe")) {
-            dataRaw = dataRaw + `<div>${$(element).html()}</div> `;
-          } else {
-            if (element.children[0].parent.name !== "script") {
-              if (element.children[0].parent.name === "p") {
-                var pContent = $(element).text();
-
-                if (isUsingOpenAPI) {
-                  const dataTitleParam =
-                    usedLavmod && !runed
-                      ? `As the administrator of a website named "Motorauthority", rewrite the following passage:: "${pContent}"`
-                      : `rewrite the following passage: "${pContent}"`;
-                  if (usedLavmod && !runed) {
-                    runed = true;
-                  }
-                  await openai
-                    .createCompletion({
-                      model: "text-davinci-003",
-                      prompt: dataTitleParam,
-                      temperature: 0,
-                      max_tokens: 3700,
-                      top_p: 1,
-                      frequency_penalty: 0,
-                      presence_penalty: 0,
-                    })
-                    .then((completion) => {
-                      const new_title_tml = completion.data.choices[0].text;
-                      const new_title = new_title_tml.replace(/[\r\n]/gm, "");
-                      // console.log("old titlePost : ", title);
-                      // console.log("new titlePost : ", new_title);
-                      dataRaw = dataRaw + `<p>${new_title}</p> `;
-                    })
-                    .catch((err) => {
-                      isOkResult = false;
-                      console.log("error: ", err.response);
-                      messageResult = `ChatGPT : ${err.response.data.error.message}`;
-                    });
-                } else {
-                  dataRaw = dataRaw + `<p>${pContent}</p> `;
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  if (isOkResult === false) {
-    return {
-      title1: null,
-      dataPost1: null,
-      msg1: messageResult,
-      driverProblem1: true,
-    };
-  }
-
-  return {
-    title1: titlePost.text(),
-    dataPost1: dataRaw,
-    msg1: messageResult,
-    driverProblem1: false,
-  };
-}
-
-async function getTitleAndPost_motorauthority(
-  html,
-  isUsingDrive,
-  isUsingOpenAPI
-) {
-  if (html) {
-    var $ = cheerio.load(html);
-  }
-
-  const titlePost = $("head > title");
-  const dataPost = $(
-    "#main > div.article-block > div > div.left-col > article > section.article-body"
-  );
-
-  // console.log("titlePost: ", titlePost.html());
-  // console.log("dataPost: ", dataPost.html());
-
-  if (dataPost.length === 0) {
-    return { title: null, dataPost: null };
-  }
-  var isOkResult = true;
-  var messageResult = "";
-
-  var dataRaw = "";
-
-  // ------------------------------- Get first image ----------------------------
-
-  const imgHtmlFirst = $("#main > div.article-block > section");
-  var random = Math.floor(Math.random() * 10000);
-  var nameImage = `first-image-${random}`;
-  const { imgSrc, isOk, message } = await getLinkImage(
-    $(imgHtmlFirst).attr("data-image-src-h"),
-    nameImage,
-    isUsingDrive
-  );
-  dataRaw = dataRaw + `<p><img src="${imgSrc}"/></p> `;
-  if (isOk == false) {
-    return {
-      title1: null,
-      dataPost1: null,
-      msg1: message,
-      driverProblem1: true,
-    };
-  }
-
-  // ----------------------------------------------------------------
-
-  var usedLavmod = false;
-  var runed = false;
-
-  for (const element of dataPost.children()) {
-    if (!isOkResult) {
-      break;
-    }
-    if (!usedLavmod) {
-      usedLavmod = Math.random() < 0.5;
-    }
 
     if (element.children[0] !== undefined) {
-      if (element.children[0].parent.name !== "span") {
-        if (element.children[0].parent.name === "p") {
+      if (element.children[0].parent.name === "p") {
+        var imgItem = $(element).find("p > img");
+
+        if (imgItem.length > 0) {
+          var item = imgItem;
+          var random = Math.floor(Math.random() * 10000);
+          var nameImage = `first-image-${random}`;
+          var src = $(item).attr("src");
+          var name = nameImage;
+          const { imgSrc, isOk, message } = await getLinkImage(
+            src,
+            name,
+            isUsingDrive
+          );
+          if (isOk === false) {
+            isOkResult = isOk;
+            messageResult = message;
+            break;
+          }
+          dataRaw =
+            dataRaw +
+            `<p style="display: flex; justify-content: center; "><img src="${imgSrc}"/></p> `;
+        } else {
           var pContent = $(element).text();
 
           if (isUsingOpenAPI) {
             const dataTitleParam =
               usedLavmod && !runed
-                ? `As the administrator of a website named "Motorauthority", rewrite the following passage:: "${pContent}"`
+                ? `As the administrator of a website named "Animalnew247", rewrite the following passage:: "${pContent}"`
                 : `rewrite the following passage: "${pContent}"`;
             if (usedLavmod && !runed) {
               runed = true;
@@ -389,110 +237,128 @@ async function getTitleAndPost_motorauthority(
           } else {
             dataRaw = dataRaw + `<p>${pContent}</p> `;
           }
-        } else if (element.children[0].parent.name === "h3") {
-          const h2Tag = $(element).text();
-
-          if (isUsingOpenAPI) {
-            const dataTitleParam = `rewrite this sentence "${h2Tag}"`;
-            await openai
-              .createCompletion({
-                model: "text-davinci-003",
-                prompt: dataTitleParam,
-                temperature: 0,
-                max_tokens: 1000,
-                top_p: 1,
-                frequency_penalty: 0,
-                presence_penalty: 0,
-              })
-              .then((completion) => {
-                const new_title_tml = completion.data.choices[0].text;
-                const new_title = new_title_tml.replace(/[\r\n]/gm, "");
-                // console.log("old titlePost : ", title);
-                // console.log("new titlePost : ", new_title);
-                dataRaw = dataRaw + `<h2>${new_title}</h2> `;
-              })
-              .catch((err) => {
-                isOkResult = false;
-                console.log("error: ----", err.response);
-                messageResult = `ChatGPT : ${err.response.data.error.message}`;
-              });
-          } else {
-            dataRaw = dataRaw + `<h2>${$(element).html()}</h2> `;
-          }
-        } else if (element.children[0].parent.name === "div") {
-          var listImg = $(element).find("div > img");
-          if (listImg.length > 0) {
-            for (var i = 0; i < listImg.length; i++) {
-              var item = listImg[i];
-              var src = $(item).attr("data-url");
-              var name = $(item).attr("name");
-              const { imgSrc, isOk, message } = await getLinkImage(
-                src,
-                name,
-                isUsingDrive
-              );
-              if (isOk === false) {
-                isOkResult = isOk;
-                messageResult = message;
-                break;
-              }
-              dataRaw = dataRaw + `<p><img src="${imgSrc}"/></p> `;
-            }
-          }
         }
       }
     }
   }
 
-  // ------------------------------- Get list image end ----------------------------
-
-  const imgSliderHTML = $(
-    "#main > div.article-block > div.article-wrap > div.left-col > div.highres-gallery > div.highres-gallery-wrapper"
-  );
-
-  if (imgSliderHTML.children().length > 0) {
-    for (var item of imgSliderHTML.children()) {
-      var listImgG = $(item).find("div > img");
-      var src = $(listImgG).attr("src");
-      var name = $(listImgG).attr("data-id");
-
-      const { imgSrc, isOk, message } = await getLinkImage(
-        src,
-        name,
-        isUsingDrive
-      );
-      if (imgSrc !== undefined) {
-        dataRaw = dataRaw + `<p><img src="${imgSrc}"/></p> `;
-      }
-
-      if (isOk == false) {
-        return {
-          title1: null,
-          dataPost1: null,
-          msg1: message,
-          driverProblem1: true,
-        };
-      }
-    }
-  }
-
-  // ----------------------------------------------------------------
-
   if (isOkResult === false) {
     return {
-      title1: null,
-      dataPost1: null,
-      msg1: messageResult,
-      driverProblem1: true,
+      title: null,
+      dataPost: null,
+      msg: messageResult,
+      driverProblem: true,
     };
   }
 
   return {
-    title1: titlePost.text(),
-    dataPost1: dataRaw,
-    msg1: messageResult,
-    driverProblem1: false,
+    title: titlePost.text(),
+    dataPost: dataRaw,
+    msg: messageResult,
+    driverProblem: false,
   };
+}
+
+async function getTitleAndPost_thebestcatpage(html, isUsingDrive) {
+  if (html) {
+    var $ = cheerio.load(html);
+  }
+
+  const dataPost = $(
+    "#content_box > div > div.single_post > div > div.thecontent.clearfix"
+  );
+
+  if (dataPost.length === 0) {
+    return { title: null, dataPost: null };
+  }
+  var isOkResult = true;
+  var messageResult = "";
+
+  if (dataPost.children().text().includes("<img")) {
+    var dataRaw = "";
+    const titlePost = $("#content_box > div > div.single_post > header > h1");
+
+    // get html : dataPost.html()
+
+    // console.log("dataPost.children().text() :", dataPost.html());
+
+    for (const element of dataPost.children()) {
+      if (!isOkResult) {
+        break;
+      }
+      const rawHTML = String($(element).html());
+
+      if ($(element).children().text().includes("<img")) {
+        // console.log("img raw: ", $(element).find("a").attr("href"));
+
+        const imgHtml = $(element).children().text();
+
+        const img = $(`<div>${imgHtml}</div>`).html();
+
+        // console.log("img: ", $(img).attr("src"));
+        // console.log("img: ", $(img).attr("width"));
+        // console.log("img: ", $(img).attr("height"));
+
+        // dataRaw = rawHTML + `<img src="${$(element).find("a").attr("href")}"/>`;
+        // origin
+        //  dataRaw = dataRaw + `<p>${$(element).children().text()}</p> `;
+
+        const { imgSrc, isOk, message } = await getLinkImage(
+          $(img).attr("src"),
+          $(img).attr("aria-describedby"),
+          isUsingDrive
+        );
+        console.log("imgSrc: ", imgSrc);
+
+        if (isOk === false) {
+          isOkResult = isOk;
+          messageResult = message;
+          break;
+        }
+
+        dataRaw =
+          dataRaw +
+          `<p><img src="${imgSrc}" width="${$(img).attr("width")}" height="${$(
+            img
+          ).attr("height")}"/></p> `;
+      } else {
+        if (rawHTML.includes("href=")) {
+          dataRaw =
+            dataRaw +
+            `<p>${rawHTML.replace(
+              /href=".*"/,
+              `href="https://www.animalnew247.com/"`
+            )}</p> `;
+        } else if ($(element).text().includes("Source:")) {
+        } else {
+          dataRaw = dataRaw + `<p>${$(element).html()}</p> `;
+        }
+      }
+    }
+
+    if (isOkResult === false) {
+      return {
+        title: null,
+        dataPost: null,
+        msg: messageResult,
+        driverProblem: true,
+      };
+    }
+
+    return {
+      title: titlePost.text(),
+      dataPost: dataRaw,
+      msg: messageResult,
+      driverProblem: false,
+    };
+  } else {
+    return {
+      title: null,
+      dataPost: null,
+      msg: messageResult,
+      driverProblem: false,
+    };
+  }
 }
 
 // ---------------- End Parser HTML --------------------------------
@@ -590,7 +456,7 @@ async function post1Link(
 
       if (domainID === 0) {
         const { title1, dataPost1, msg1, driverProblem1 } =
-          await getTitleAndPost_motorauthority(
+          await getTitleAndPost_hotnewsmm(
             pageHtml.data,
             isUsingDrive,
             isUsingOpenAPI
@@ -602,7 +468,7 @@ async function post1Link(
         driverProblem = driverProblem1;
       } else if (domainID === 1) {
         const { title1, dataPost1, msg1, driverProblem1 } =
-          await getTitleAndPost_hotcars(
+          await getTitleAndPost_thebestcatpage(
             pageHtml.data,
             isUsingDrive,
             isUsingOpenAPI
