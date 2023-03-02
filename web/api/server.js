@@ -77,9 +77,17 @@ async function getAllLinkInPage(link, domainId) {
     })
     .then((result) => {
       var $ = cheerio.load(result.data);
-      const listAtagName = $(
-        "#main > div.two-column > div.content-wrap > div.article-list > ul > li"
-      );
+      var listAtagName;
+      if (domainId === 0) {
+        listAtagName = $(
+          "#main > div.two-column > div.content-wrap > div.article-list > ul > li"
+        );
+      }
+      if (domainId === 1) {
+        listAtagName = $(
+          "body > main > section.wrapper.w-listing.page1.listing-tag > div.w-grid-system.grid-content.listing > section > div.sentinel-listing-page-list.browse-half.clip-half > article.browse-clip > div > h3"
+        );
+      }
       if (listAtagName.length === 0) {
         return {
           isOk: false,
@@ -168,7 +176,6 @@ async function getTitleAndPost_hotcars(html, isUsingDrive, isUsingOpenAPI) {
     }
     if (element.children.length > 0) {
       if (element.children[0] !== undefined) {
-
         if (element.children[0].parent.name === "h2") {
           const h2Tag = $(element).text();
 
