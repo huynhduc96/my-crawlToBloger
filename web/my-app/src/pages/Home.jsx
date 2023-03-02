@@ -149,6 +149,10 @@ const domainData = [
     id: 0,
     value: "https://www.motorauthority.com/",
   },
+  {
+    id: 1,
+    value: "https://www.hotcars.com/",
+  },
 ];
 
 const Home = () => {
@@ -173,6 +177,7 @@ const Home = () => {
   const [linkPageIsValid, setLinkPageIsValid] = React.useState(true);
   const [isButtonOk, setIsButtonOK] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
+  const [stopFunc, setStopFunc] = React.useState(false);
   const [loadingList, setLoadingList] = React.useState({
     all: false,
     onProcess: false,
@@ -314,7 +319,9 @@ const Home = () => {
               Post Result
             </div>
             <hr className="h-[2px] my-10 bg-[#000] w-full mx-10"></hr>
-            <div className={`flex flex-col whitespace-pre-wrap mb-10`}>
+            <div
+              className={`flex flex-col whitespace-pre-wrap mb-10 max-h-[900px] overflow-y-scroll`}
+            >
               {dataItem}
             </div>
             <Button
@@ -335,6 +342,7 @@ const Home = () => {
                   message: "",
                   data: null,
                 });
+                setStopFunc(false);
               }}
               className={"h-[50px]"}
             >
@@ -346,7 +354,7 @@ const Home = () => {
       {loadingList.all && (
         <div className="fixed right-0 bottom-0 top-0 left-0 h-[100%] w-[100%] flex justify-center items-center bg-[#00000050] z-10">
           <div
-            className={`flex flex-col items-center justify-center p-5 rounded-[24px] border-[1px] border-blue-700  border-solid bg-[#fff] w-[800px] max-h-[2000px] overflow-y-scroll`}
+            className={`flex flex-col items-center justify-center p-5 rounded-[24px] border-[1px] border-blue-700  border-solid bg-[#fff] w-[800px] max-h-[1000px] overflow-y-scroll`}
           >
             {loadingList.onProcess && (
               <div className="flex w-full h-[100px] items-center justify-center">
@@ -357,7 +365,9 @@ const Home = () => {
               Post Result
             </div>
             <hr className="h-[2px] my-10 bg-[#000] w-full mx-10"></hr>
-            <div className={`flex flex-col whitespace-pre-wrap mb-10`}>
+            <div
+              className={`flex flex-col whitespace-pre-wrap mb-10 max-h-[900px] overflow-y-scroll`}
+            >
               {dataItem}
             </div>
             <Button
@@ -377,6 +387,7 @@ const Home = () => {
                   message: "",
                   data: null,
                 });
+                setStopFunc(false);
               }}
               className={"h-[50px]"}
             >
@@ -452,7 +463,7 @@ const Home = () => {
                 </div>
                 <div className="p-5 rounded-[24px] border-[1px] border-blue-700  border-solid mt-5">
                   <div className="mb-1 mt-2 flex">
-                    Using ChatGPT to rewite title :
+                    Using ChatGPT to rewite post :
                     <p className="font-bold ml-2 text-red-500">
                       {" "}
                       {chatGPTType.value}
@@ -474,7 +485,7 @@ const Home = () => {
                     ))}
                   </RadioGroup>
                   <p className="font-normal">
-                    {"We can Using ChatGPT to rewrite title"}
+                    {"We can Using ChatGPT to rewrite post"}
                   </p>
                 </div>
                 <p className="font-bold mt-10">Domain Execute</p>
@@ -664,7 +675,7 @@ const Home = () => {
                         </div>
 
                         <div
-                          className={`flex flex-col whitespace-pre-wrap mb-10`}
+                          className={`flex flex-col whitespace-pre-wrap mb-10 max-h-[900px] overflow-y-scroll`}
                         >
                           {allLinkStatus.show && (
                             <div className="flex flex-col rounded-[24px] border-[1px] border-orange-700  border-solid mt-10 p-5 max-w-[600px]">
@@ -712,21 +723,40 @@ const Home = () => {
                                         timePost: formatRFC3339(timeToPost),
                                         domainID: domain.id,
                                         // eslint-disable-next-line no-loop-func
-                                      }).then((e) => {
-                                        var msg = `${
-                                          e.message
-                                        } in Time : ${formatRFC3339(
-                                          timeToPost
-                                        )}`;
-                                        setDataShow((oldArray) => [
-                                          ...oldArray,
-                                          {
-                                            id: link,
-                                            isOk: e.isOk,
-                                            message: msg,
-                                          },
-                                        ]);
-                                      });
+                                      })
+                                        .then((e) => {
+                                          var msg = `=====> ${link} : \n ${
+                                            e.message
+                                          } in Time : ${formatRFC3339(
+                                            timeToPost
+                                          )}`;
+                                          setDataShow((oldArray) => [
+                                            ...oldArray,
+                                            {
+                                              id: link,
+                                              isOk: e.isOk,
+                                              message: msg,
+                                            },
+                                          ]);
+                                        })
+                                        .catch((e) => {
+                                          setDataShow((oldArray) => [
+                                            ...oldArray,
+                                            {
+                                              id: link,
+                                              isOk: false,
+                                              message: `Maybe server error ! Check server Please!`,
+                                            },
+                                          ]);
+                                          setStopFunc(true);
+                                          setLoadingList({
+                                            all: true,
+                                            onProcess: false,
+                                          });
+                                        });
+                                      if (stopFunc) {
+                                        break;
+                                      }
                                       timeToPost = addHours(
                                         timeToPost,
                                         intervalBetweenPostTime.time
@@ -851,22 +881,47 @@ const Home = () => {
                                     timePost: formatRFC3339(timeToPost),
                                     domainID: domain.id,
                                     // eslint-disable-next-line no-loop-func
-                                  }).then((e) => {
-                                    var msg = `${
-                                      e.message
-                                    } in Time : ${formatRFC3339(timeToPost)}`;
-                                    setDataShow((oldArray) => [
-                                      ...oldArray,
-                                      {
-                                        id: link,
-                                        isOk: e.isOk,
-                                        message: msg,
-                                      },
-                                    ]);
-                                  });
-                                  timeToPost = addHours(timeToPost, 4);
+                                  })
+                                    .then((e) => {
+                                      var msg = `======> ${link} : \n ${
+                                        e.message
+                                      } in Time : ${formatRFC3339(timeToPost)}`;
+                                      setDataShow((oldArray) => [
+                                        ...oldArray,
+                                        {
+                                          id: link,
+                                          isOk: e.isOk,
+                                          message: msg,
+                                        },
+                                      ]);
+                                    })
+                                    .catch((e) => {
+                                      setDataShow((oldArray) => [
+                                        ...oldArray,
+                                        {
+                                          id: link,
+                                          isOk: false,
+                                          message: `Maybe server error ! Check server Please!`,
+                                        },
+                                      ]);
+                                      setStopFunc(true);
+                                      setLoadingList({
+                                        all: true,
+                                        onProcess: false,
+                                      });
+                                    });
+                                    await new Promise((r) => {
+                                      setTimeout(r, 600);
+                                    });
+                                  timeToPost = addHours(
+                                    timeToPost,
+                                    intervalBetweenPostTime.time
+                                  );
+                                  if (stopFunc) {                                    
+                                    break;
+                                  }
                                   await new Promise((r) => {
-                                    setTimeout(r, 1 * 1000);
+                                    setTimeout(r, 150 * 1000);
                                   });
                                 }
                                 setLoadingList({
@@ -922,15 +977,24 @@ const Home = () => {
                                 ? formatRFC3339(new Date())
                                 : formatRFC3339(timePost),
                             domainID: domain.id,
-                          }).then((e) => {
-                            console.log(e);
-                            setLoading(false);
-                            setPostDataStatus({
-                              show: true,
-                              isOk: e.isOk,
-                              message: e.message,
+                          })
+                            .then((e) => {
+                              console.log(e);
+                              setLoading(false);
+                              setPostDataStatus({
+                                show: true,
+                                isOk: e.isOk,
+                                message: `====> ${linkDemo} : ${e.message}`,
+                              });
+                            })
+                            .catch((e) => {
+                              setLoading(false);
+                              setPostDataStatus({
+                                show: true,
+                                isOk: false,
+                                message: `Maybe server error ! Check server Please! `,
+                              });
                             });
-                          });
                         }}
                       >
                         {"Crawl and post singer Link to Blogger"}

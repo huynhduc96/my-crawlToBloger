@@ -1,9 +1,16 @@
 export async function postOneLinkToBlogspot(data) {
+  const timeout = 420 * 1000;
+
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+
   const response = await fetch(`/api/singerlinktoblogspot`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ inputParam: data }),
+    signal: controller.signal,
   });
+  clearTimeout(id);
   return await response.json();
 }
 
