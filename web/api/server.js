@@ -36,6 +36,7 @@ const domainList = [
 
 // read file
 const fs = require("fs");
+const { datapipelines } = require("googleapis/build/src/apis/datapipelines");
 var blogId = "";
 var openAPIKey = "";
 var googleDriveFolderID = "";
@@ -157,10 +158,10 @@ async function getTitleAndPost_hotnewsmm(html, isUsingDrive, isUsingOpenAPI) {
       `<img style="display: none;" src="${imgSrc}" height="${height}" width="${width}" />`;
     if (isOk == false) {
       return {
-        title: null,
-        dataPost: null,
-        msg: message,
-        driverProblem: true,
+        title1: null,
+        dataPost1: null,
+        msg1: message,
+        driverProblem1: true,
       };
     }
   }
@@ -244,18 +245,18 @@ async function getTitleAndPost_hotnewsmm(html, isUsingDrive, isUsingOpenAPI) {
 
   if (isOkResult === false) {
     return {
-      title: null,
-      dataPost: null,
-      msg: messageResult,
-      driverProblem: true,
+      title1: null,
+      dataPost1: null,
+      msg1: messageResult,
+      driverProblem1: true,
     };
   }
 
   return {
-    title: titlePost.text(),
-    dataPost: dataRaw,
-    msg: messageResult,
-    driverProblem: false,
+    title1: titlePost.text(),
+    dataPost1: dataRaw,
+    msg1: messageResult,
+    driverProblem1: false,
   };
 }
 
@@ -338,25 +339,25 @@ async function getTitleAndPost_thebestcatpage(html, isUsingDrive) {
 
     if (isOkResult === false) {
       return {
-        title: null,
-        dataPost: null,
-        msg: messageResult,
-        driverProblem: true,
+        title1: null,
+        dataPost1: null,
+        msg1: messageResult,
+        driverProblem1: true,
       };
     }
 
     return {
-      title: titlePost.text(),
-      dataPost: dataRaw,
-      msg: messageResult,
-      driverProblem: false,
+      title1: titlePost.text(),
+      dataPost1: dataRaw,
+      msg1: messageResult,
+      driverProblem1: false,
     };
   } else {
     return {
-      title: null,
-      dataPost: null,
-      msg: messageResult,
-      driverProblem: false,
+      title1: null,
+      dataPost1: null,
+      msg1: messageResult,
+      driverProblem1: false,
     };
   }
 }
@@ -449,8 +450,8 @@ async function post1Link(
     return { isOk: false, message: `${link} : \n Link Not Found : Code 404` };
   } else {
     if (pageHtml.data) {
-      var title;
-      var dataPost;
+      var title= null;
+      var dataPost= null;
       var msg;
       var driverProblem;
 
