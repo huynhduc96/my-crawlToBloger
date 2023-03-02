@@ -147,11 +147,11 @@ const postType = [
 const domainData = [
   {
     id: 0,
-    value: "https://www.motorauthority.com/",
+    value: "https://my.hotnewsmm.xyz/",
   },
   {
     id: 1,
-    value: "https://www.hotcars.com/",
+    value: "https://thebestcatpage.com/",
   },
 ];
 
