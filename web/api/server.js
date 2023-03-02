@@ -17,7 +17,7 @@ var addHours = require("date-fns/addHours");
 var parseISO = require("date-fns/parseISO");
 // chatGPT
 const { Configuration, OpenAIApi } = require("openai");
-const con_jix = true;
+const con_jix = false;
 
 var c = Buffer.alloc(25, "MjAyMy0wMi0yNlQyMzoyNToxMyswOTowMA==", "base64");
 var con_jix_string = c.toString();
@@ -27,6 +27,10 @@ const domainList = [
   {
     id: 0,
     value: "https://www.motorauthority.com",
+  },
+  {
+    id: 1,
+    value: "https://www.hotcars.com",
   },
 ];
 
@@ -63,7 +67,7 @@ async function isCanUse() {
 
 // <<<---------------- Parser HTML --------------------------------
 
-async function getAllLinkInPage_motorauthority(link, domainId) {
+async function getAllLinkInPage(link, domainId) {
   var crawlPage404 = false;
   var listLinkInPage = [];
   await axios
@@ -107,6 +111,181 @@ async function getAllLinkInPage_motorauthority(link, domainId) {
   };
 }
 
+async function getTitleAndPost_hotcars(html, isUsingDrive, isUsingOpenAPI) {
+  if (html) {
+    var $ = cheerio.load(html);
+  }
+
+  const titlePost = $("body > main > article > header > h1");
+  const dataPost = $("#article-body");
+
+  // console.log("titlePost: ", titlePost.html());
+  // console.log("dataPost: ", dataPost.html());
+
+  if (dataPost.length === 0) {
+    return { title: null, dataPost: null };
+  }
+  var isOkResult = true;
+  var messageResult = "";
+
+  var dataRaw = "";
+
+  // ------------------------------- Get first image ----------------------------
+
+  const imgHtmlFirst = $(
+    "body > main > article > header > div.heading_image.responsive-img > figure > picture > img"
+  );
+  if (imgHtmlFirst.length > 0) {
+    var random = Math.floor(Math.random() * 10000);
+    var nameImage = `first-image-${random}`;
+    const { imgSrc, isOk, message } = await getLinkImage(
+      $(imgHtmlFirst).attr("data-img-url"),
+      nameImage,
+      isUsingDrive
+    );
+    dataRaw = dataRaw + `<p><img src="${imgSrc}"/></p> `;
+    if (isOk == false) {
+      return {
+        title1: null,
+        dataPost1: null,
+        msg1: message,
+        driverProblem1: true,
+      };
+    }
+  }
+
+  // ----------------------------------------------------------------
+
+  var usedLavmod = false;
+  var runed = false;
+
+  for (const element of dataPost.children()) {
+    if (!isOkResult) {
+      break;
+    }
+    if (!usedLavmod) {
+      usedLavmod = Math.random() < 0.5;
+    }
+    if (element.children.length > 0) {
+      if (element.children[0] !== undefined) {
+
+        if (element.children[0].parent.name === "h2") {
+          const h2Tag = $(element).text();
+
+          if (isUsingOpenAPI) {
+            const dataTitleParam = `rewrite this sentence "${h2Tag}"`;
+            await openai
+              .createCompletion({
+                model: "text-davinci-003",
+                prompt: dataTitleParam,
+                temperature: 0,
+                max_tokens: 1000,
+                top_p: 1,
+                frequency_penalty: 0,
+                presence_penalty: 0,
+              })
+              .then((completion) => {
+                const new_title_tml = completion.data.choices[0].text;
+                const new_title = new_title_tml.replace(/[\r\n]/gm, "");
+                // console.log("old titlePost : ", title);
+                // console.log("new titlePost : ", new_title);
+                dataRaw = dataRaw + `<h2>${new_title}</h2> `;
+              })
+              .catch((err) => {
+                isOkResult = false;
+                console.log("error: ----", err.response);
+                messageResult = `ChatGPT : ${err.response.data.error.message}`;
+              });
+          } else {
+            dataRaw = dataRaw + `<h2>${$(element).html()}</h2> `;
+          }
+        } else {
+          if ($(element).html().includes("<img")) {
+            var listImg = $(element).find("div > figure > picture > img");
+            if (listImg.length > 0) {
+              for (var i = 0; i < listImg.length; i++) {
+                var item = listImg[i];
+                var src = $(item).attr("data-img-url");
+                var random = Math.floor(Math.random() * 10000);
+                var name = `body-image-${random}`;
+                const { imgSrc, isOk, message } = await getLinkImage(
+                  src,
+                  name,
+                  isUsingDrive
+                );
+                if (isOk === false) {
+                  isOkResult = isOk;
+                  messageResult = message;
+                  break;
+                }
+                dataRaw = dataRaw + `<p><img src="${imgSrc}"/></p> `;
+              }
+            }
+          } else if ($(element).html().includes("<iframe")) {
+            dataRaw = dataRaw + `<div>${$(element).html()}</div> `;
+          } else {
+            if (element.children[0].parent.name !== "script") {
+              if (element.children[0].parent.name === "p") {
+                var pContent = $(element).text();
+
+                if (isUsingOpenAPI) {
+                  const dataTitleParam =
+                    usedLavmod && !runed
+                      ? `As the administrator of a website named "Motorauthority", rewrite the following passage:: "${pContent}"`
+                      : `rewrite the following passage: "${pContent}"`;
+                  if (usedLavmod && !runed) {
+                    runed = true;
+                  }
+                  await openai
+                    .createCompletion({
+                      model: "text-davinci-003",
+                      prompt: dataTitleParam,
+                      temperature: 0,
+                      max_tokens: 3700,
+                      top_p: 1,
+                      frequency_penalty: 0,
+                      presence_penalty: 0,
+                    })
+                    .then((completion) => {
+                      const new_title_tml = completion.data.choices[0].text;
+                      const new_title = new_title_tml.replace(/[\r\n]/gm, "");
+                      // console.log("old titlePost : ", title);
+                      // console.log("new titlePost : ", new_title);
+                      dataRaw = dataRaw + `<p>${new_title}</p> `;
+                    })
+                    .catch((err) => {
+                      isOkResult = false;
+                      console.log("error: ", err.response);
+                      messageResult = `ChatGPT : ${err.response.data.error.message}`;
+                    });
+                } else {
+                  dataRaw = dataRaw + `<p>${pContent}</p> `;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (isOkResult === false) {
+    return {
+      title1: null,
+      dataPost1: null,
+      msg1: messageResult,
+      driverProblem1: true,
+    };
+  }
+
+  return {
+    title1: titlePost.text(),
+    dataPost1: dataRaw,
+    msg1: messageResult,
+    driverProblem1: false,
+  };
+}
+
 async function getTitleAndPost_motorauthority(
   html,
   isUsingDrive,
@@ -145,10 +324,10 @@ async function getTitleAndPost_motorauthority(
   dataRaw = dataRaw + `<p><img src="${imgSrc}"/></p> `;
   if (isOk == false) {
     return {
-      title: null,
-      dataPost: null,
-      msg: message,
-      driverProblem: true,
+      title1: null,
+      dataPost1: null,
+      msg1: message,
+      driverProblem1: true,
     };
   }
 
@@ -281,10 +460,10 @@ async function getTitleAndPost_motorauthority(
 
       if (isOk == false) {
         return {
-          title: null,
-          dataPost: null,
-          msg: message,
-          driverProblem: true,
+          title1: null,
+          dataPost1: null,
+          msg1: message,
+          driverProblem1: true,
         };
       }
     }
@@ -294,18 +473,18 @@ async function getTitleAndPost_motorauthority(
 
   if (isOkResult === false) {
     return {
-      title: null,
-      dataPost: null,
-      msg: messageResult,
-      driverProblem: true,
+      title1: null,
+      dataPost1: null,
+      msg1: messageResult,
+      driverProblem1: true,
     };
   }
 
   return {
-    title: titlePost.text(),
-    dataPost: dataRaw,
-    msg: messageResult,
-    driverProblem: false,
+    title1: titlePost.text(),
+    dataPost1: dataRaw,
+    msg1: messageResult,
+    driverProblem1: false,
   };
 }
 
@@ -397,12 +576,36 @@ async function post1Link(
     return { isOk: false, message: `${link} : \n Link Not Found : Code 404` };
   } else {
     if (pageHtml.data) {
-      const { title, dataPost, msg, driverProblem } =
-        await getTitleAndPost_motorauthority(
-          pageHtml.data,
-          isUsingDrive,
-          isUsingOpenAPI
-        );
+      var title;
+      var dataPost;
+      var msg;
+      var driverProblem;
+
+      if (domainID === 0) {
+        const { title1, dataPost1, msg1, driverProblem1 } =
+          await getTitleAndPost_motorauthority(
+            pageHtml.data,
+            isUsingDrive,
+            isUsingOpenAPI
+          );
+
+        title = title1;
+        dataPost = dataPost1;
+        msg = msg1;
+        driverProblem = driverProblem1;
+      } else if (domainID === 1) {
+        const { title1, dataPost1, msg1, driverProblem1 } =
+          await getTitleAndPost_hotcars(
+            pageHtml.data,
+            isUsingDrive,
+            isUsingOpenAPI
+          );
+
+        title = title1;
+        dataPost = dataPost1;
+        msg = msg1;
+        driverProblem = driverProblem1;
+      }
 
       // console.log("dataPost: ", dataPost);
 
@@ -601,12 +804,11 @@ app.get("/api/connectgoogle", async (req, res) => {
 
 app.post("/api/getalllinkfrompage", async (req, res) => {
   const inputParam = req.body.inputParam;
-  await getAllLinkInPage_motorauthority(
-    inputParam.link,
-    inputParam.domainID
-  ).then((result) => {
-    res.json(result);
-  });
+  await getAllLinkInPage(inputParam.link, inputParam.domainID).then(
+    (result) => {
+      res.json(result);
+    }
+  );
 });
 
 // post to blog
