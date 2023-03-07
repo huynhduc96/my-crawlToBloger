@@ -100,7 +100,7 @@ async function getAllLinkInPage(link, domainId) {
         if (linkInPage !== undefined) {
           if (domainId === 1) {
             listLinkInPage.push(`${linkInPage}`);
-          }else {
+          } else {
             listLinkInPage.push(`${domainList[domainId].value}${linkInPage}`);
           }
         }
@@ -184,24 +184,27 @@ async function getTitleAndPost_hotnewsmm(html, isUsingDrive, isUsingOpenAPI) {
         var imgItem = $(element).find("p > img");
 
         if (imgItem.length > 0) {
-          var item = imgItem;
-          var random = Math.floor(Math.random() * 10000);
-          var nameImage = `first-image-${random}`;
-          var src = $(item).attr("src");
-          var name = nameImage;
-          const { imgSrc, isOk, message } = await getLinkImage(
-            src,
-            name,
-            isUsingDrive
-          );
-          if (isOk === false) {
-            isOkResult = isOk;
-            messageResult = message;
-            break;
+          for (var i = 0; i < imgItem.length; i++) {
+            var item = imgItem[i];
+            var src = $(item).attr("src");
+            var random = Math.floor(Math.random() * 10000);
+            var name = `body-image-${random}`;
+            const { imgSrc, isOk, message } = await getLinkImage(
+              src,
+              name,
+              isUsingDrive
+            );
+            if (isOk === false) {
+              isOkResult = isOk;
+              messageResult = message;
+              break;
+            }
+            if (imgSrc !== undefined) {
+              dataRaw =
+                dataRaw +
+                `<p style="display: flex; justify-content: center; "><img src="${imgSrc}"/></p> `;
+            }
           }
-          dataRaw =
-            dataRaw +
-            `<p style="display: flex; justify-content: center; "><img src="${imgSrc}"/></p> `;
         } else {
           var pContent = $(element).text();
 
@@ -422,7 +425,8 @@ async function getLinkImage(src, name, isUsingDrive) {
 // <<<--------------- Post 1 link -------------------------
 async function post1Link(
   link,
-  isUsingOpenAPI,
+  isUsingOpenAPIForBody,
+  isUsingOpenAPIForTitle,
   isUsingDrive,
   startTime,
   tag,
@@ -450,8 +454,8 @@ async function post1Link(
     return { isOk: false, message: `${link} : \n Link Not Found : Code 404` };
   } else {
     if (pageHtml.data) {
-      var title= null;
-      var dataPost= null;
+      var title = null;
+      var dataPost = null;
       var msg;
       var driverProblem;
 
@@ -460,7 +464,7 @@ async function post1Link(
           await getTitleAndPost_hotnewsmm(
             pageHtml.data,
             isUsingDrive,
-            isUsingOpenAPI
+            isUsingOpenAPIForBody
           );
 
         title = title1;
@@ -472,7 +476,7 @@ async function post1Link(
           await getTitleAndPost_thebestcatpage(
             pageHtml.data,
             isUsingDrive,
-            isUsingOpenAPI
+            isUsingOpenAPIForBody
           );
 
         title = title1;
@@ -481,7 +485,7 @@ async function post1Link(
         driverProblem = driverProblem1;
       }
 
-      // console.log("dataPost: ", dataPost);
+      console.log("dataPost: ", dataPost);
 
       if ((title === null || dataPost === null) && !driverProblem) {
         return {
@@ -498,7 +502,7 @@ async function post1Link(
       }
 
       var titlePost;
-      if (isUsingOpenAPI) {
+      if (isUsingOpenAPIForTitle) {
         const dataTitleParam = `rewrite this sentence "${title}"`;
         await openai
           .createCompletion({
@@ -532,7 +536,7 @@ async function post1Link(
       }
       // console.log("titlePost : ", titlePost);
       // console.log("new dataPost : ", dataPost)
-      if (isUsingOpenAPI && !result.isOk) {
+      if (isUsingOpenAPIForBody && !result.isOk) {
         return result;
       }
       // post to blogger website
@@ -693,7 +697,8 @@ app.post("/api/singerlinktoblogspot", async (req, res) => {
   //link,isUsingOpenAPI, isUsingDrive, startTime, tag
   await post1Link(
     inputParam.linkDemo,
-    inputParam.usingGPT,
+    inputParam.usingGPTForBody,
+    inputParam.usingGPTForTitle,
     inputParam.uploadImage,
     inputParam.timePost,
     inputParam.tag,

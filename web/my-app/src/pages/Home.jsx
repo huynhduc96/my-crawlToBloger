@@ -112,14 +112,25 @@ const listLinkTypeData = [
   },
 ];
 
-const chatGPTTypeData = [
+const chatGPTBodyTypeData = [
   {
     id: 0,
     value: "Not Use",
   },
   {
     id: 1,
-    value: "Using",
+    value: "Rewrite Body",
+  },
+];
+
+const chatGPTTitleTypeData = [
+  {
+    id: 0,
+    value: "Not Use",
+  },
+  {
+    id: 1,
+    value: "Rewrite Title",
   },
 ];
 
@@ -167,7 +178,10 @@ const Home = () => {
   );
   const [listLinkType, setListLinkType] = React.useState(listLinkTypeData[0]);
   const [imageType, setImageType] = React.useState(imageTypeData[0]);
-  const [chatGPTType, setChatGPTType] = React.useState(chatGPTTypeData[0]);
+  const [chatGPTType, setChatGPTType] = React.useState(chatGPTBodyTypeData[0]);
+  const [chatGPTTitleType, setChatGPTTitleType] = React.useState(
+    chatGPTTitleTypeData[0]
+  );
   const [domain, setDomain] = React.useState(domainData[0]);
   const [linkDemo, setLinkDemo] = React.useState("");
   const [linkPage, setLinkPage] = React.useState("");
@@ -225,7 +239,10 @@ const Home = () => {
   };
 
   const updateChatGPTType = (event, type) => {
-    setChatGPTType(chatGPTTypeData[type]);
+    setChatGPTType(chatGPTBodyTypeData[type]);
+  };
+  const updateChatGPTTitleType = (event, type) => {
+    setChatGPTTitleType(chatGPTTitleTypeData[type]);
   };
 
   const updateDomain = (event) => {
@@ -463,10 +480,15 @@ const Home = () => {
                 </div>
                 <div className="p-5 rounded-[24px] border-[1px] border-blue-700  border-solid mt-5">
                   <div className="mb-1 mt-2 flex">
-                    Using ChatGPT to rewite post :
-                    <p className="font-bold ml-2 text-red-500">
-                      {" "}
-                      {chatGPTType.value}
+                    <p className="flex items-baseline">
+                      Using ChatGPT to rewrite
+                      <p className="text-red-500 font-bold text-[20px] px-1">
+                        Body
+                      </p>
+                      post :
+                      <p className="font-bold ml-2 text-red-500">
+                        {chatGPTType.value}
+                      </p>
                     </p>
                   </div>
                   <RadioGroup
@@ -475,7 +497,7 @@ const Home = () => {
                     value={chatGPTType.id}
                     onChange={updateChatGPTType}
                   >
-                    {chatGPTTypeData.map((datum) => (
+                    {chatGPTBodyTypeData.map((datum) => (
                       <FormControlLabel
                         label={datum.value}
                         key={datum.value}
@@ -486,6 +508,38 @@ const Home = () => {
                   </RadioGroup>
                   <p className="font-normal">
                     {"We can Using ChatGPT to rewrite post"}
+                  </p>
+                </div>
+                <div className="p-5 rounded-[24px] border-[1px] border-blue-700  border-solid mt-5">
+                  <div className="mb-1 mt-2 flex">
+                    <p className="flex items-baseline">
+                      Using ChatGPT to rewrite
+                      <p className="text-red-500 font-bold text-[20px] px-1">
+                        title
+                      </p>
+                      post :
+                      <p className="font-bold ml-2 text-red-500">
+                        {chatGPTTitleType.value}
+                      </p>
+                    </p>
+                  </div>
+                  <RadioGroup
+                    name="value"
+                    row
+                    value={chatGPTTitleType.id}
+                    onChange={updateChatGPTTitleType}
+                  >
+                    {chatGPTTitleTypeData.map((datum) => (
+                      <FormControlLabel
+                        label={datum.value}
+                        key={datum.value}
+                        value={datum.id}
+                        control={<Radio color="primary" />}
+                      />
+                    ))}
+                  </RadioGroup>
+                  <p className="font-normal">
+                    {"We can Using ChatGPT to rewrite title post"}
                   </p>
                 </div>
                 <p className="font-bold mt-10">Domain Execute</p>
@@ -715,8 +769,12 @@ const Home = () => {
                                           runType.id === 0 ? true : false,
                                         uploadImage:
                                           imageType.id === 0 ? false : true,
-                                        usingGPT:
+                                        usingGPTForBody:
                                           chatGPTType.id === 0 ? false : true,
+                                        usingGPTForTitle:
+                                          chatGPTTitleType.id === 0
+                                            ? false
+                                            : true,
                                         domain: domain.id,
                                         linkDemo: link,
                                         tag: tag,
@@ -873,8 +931,10 @@ const Home = () => {
                                     runTest: runType.id === 0 ? true : false,
                                     uploadImage:
                                       imageType.id === 0 ? false : true,
-                                    usingGPT:
+                                    usingGPTForBody:
                                       chatGPTType.id === 0 ? false : true,
+                                    usingGPTForTitle:
+                                      chatGPTTitleType.id === 0 ? false : true,
                                     domain: domain.id,
                                     linkDemo: link,
                                     tag: tag,
@@ -910,14 +970,14 @@ const Home = () => {
                                         onProcess: false,
                                       });
                                     });
-                                    await new Promise((r) => {
-                                      setTimeout(r, 600);
-                                    });
+                                  await new Promise((r) => {
+                                    setTimeout(r, 600);
+                                  });
                                   timeToPost = addHours(
                                     timeToPost,
                                     intervalBetweenPostTime.time
                                   );
-                                  if (stopFunc) {                                    
+                                  if (stopFunc) {
                                     break;
                                   }
                                   await new Promise((r) => {
@@ -968,7 +1028,10 @@ const Home = () => {
                           postOneLinkToBlogspot({
                             runTest: runType.id === 0 ? true : false,
                             uploadImage: imageType.id === 0 ? false : true,
-                            usingGPT: chatGPTType.id === 0 ? false : true,
+                            usingGPTForBody:
+                              chatGPTType.id === 0 ? false : true,
+                            usingGPTForTitle:
+                              chatGPTTitleType.id === 0 ? false : true,
                             domain: domain.id,
                             linkDemo: linkDemo,
                             tag: tag,
